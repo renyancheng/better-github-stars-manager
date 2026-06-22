@@ -22,17 +22,25 @@ import { authStore } from '@/auth/auth-store';
 const PER_PAGE = 100;
 const API = 'https://api.github.com';
 
-interface StarredItem {
-  full_name: string;
-  html_url: string;
-  description: string | null;
-  language: string | null;
-  stargazers_count: number;
-  topics?: string[];
-  pushed_at: string;
-  fork: boolean;
-  archived: boolean;
+/**
+ * Response shape for GET /user/starred with Accept: application/vnd.github.star+json.
+ * NOTE: this media type wraps each repo in a `repo` object alongside `starred_at`.
+ * (The default Accept returns repos flat but WITHOUT starred_at, which we need as
+ * the incremental-sync cursor — so we use the star+json media type and unwrap.)
+ */
+interface StarredRepoPayload {
   starred_at: string;
+  repo: {
+    full_name: string;
+    html_url: string;
+    description: string | null;
+    language: string | null;
+    stargazers_count: number;
+    topics?: string[];
+    pushed_at: string;
+    fork: boolean;
+    archived: boolean;
+  };
 }
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -58,7 +66,7 @@ function withTimeout(ms: number): { signal: AbortSignal; cancel: () => void } {
   return { signal: ctrl.signal, cancel: () => clearTimeout(t) };
 }
 
-async function fetchPage(page: number): Promise<{ items: StarredItem[]; link: string | null }> {
+async function fetchPage(page: number): Promise<{ items: StarredRepoPayload[]; link: string | null }> {
   const { signal, cancel } = withTimeout(30_000);
   let res: Response;
   try {
@@ -86,21 +94,27 @@ async function fetchPage(page: number): Promise<{ items: StarredItem[]; link: st
     return { items: [], link: res.headers.get('link') };
   }
   if (!res.ok) throw new Error(`GitHub /user/starred page ${page} returned ${res.status}`);
-  const items = (await res.json()) as StarredItem[];
+  const items = (await res.json()) as StarredRepoPayload[];
+  // Guard against an unexpected flat shape (e.g. if GitHub changes media behavior):
+  // if items have no nested `repo`, the put() below would fail with a bad key.
+  if (items.length && !items[0].repo) {
+    throw new Error('Unexpected /user/starred shape: no nested `repo` object. Got: ' + JSON.stringify(Object.keys(items[0])));
+  }
   return { items, link: res.headers.get('link') };
 }
 
-function toStar(it: StarredItem): Star {
+export function toStar(it: StarredRepoPayload): Star {
+  const r = it.repo;
   return {
-    full_name: it.full_name,
-    html_url: it.html_url,
-    description: it.description ?? '',
-    language: it.language,
-    stargazers_count: it.stargazers_count,
-    topics: it.topics ?? [],
-    pushed_at: it.pushed_at,
-    fork: it.fork,
-    archived: it.archived,
+    full_name: r.full_name,
+    html_url: r.html_url,
+    description: r.description ?? '',
+    language: r.language,
+    stargazers_count: r.stargazers_count,
+    topics: r.topics ?? [],
+    pushed_at: r.pushed_at,
+    fork: r.fork,
+    archived: r.archived,
     starred_at: it.starred_at,
     tombstone: false,
     synced_at: new Date().toISOString(),
@@ -108,8 +122,8 @@ function toStar(it: StarredItem): Star {
 }
 
 /** Concurrently fetch a range of pages, bounded to avoid hammering the API. */
-async function fetchPages(pages: number[], concurrency = 6): Promise<StarredItem[][]> {
-  const out: StarredItem[][] = [];
+async function fetchPages(pages: number[], concurrency = 6): Promise<StarredRepoPayload[][]> {
+  const out: StarredRepoPayload[][] = [];
   let idx = 0;
   const workers = Array.from({ length: Math.min(concurrency, pages.length) }, async () => {
     while (idx < pages.length) {
@@ -185,7 +199,7 @@ export const githubStarSource: StarSource = {
     const restPages = total > 1 ? Array.from({ length: total - 1 }, (_, i) => i + 2) : [];
     const rest = await fetchPages(restPages);
     const all = [...first.items, ...rest.flat()];
-    const apiNames = new Set(all.map((it) => it.full_name));
+    const apiNames = new Set(all.map((it) => it.repo.full_name));
 
     // Refresh all live repos.
     await db.stars.bulkPut(all.map(toStar));

@@ -7,9 +7,10 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types tests/logic.test.ts && tsx tests/integration.test.ts",
+    "test": "node --experimental-strip-types tests/logic.test.ts && tsx tests/integration.test.ts && tsx tests/shape.test.ts",
     "test:logic": "node --experimental-strip-types tests/logic.test.ts",
     "test:integration": "tsx tests/integration.test.ts",
+    "test:shape": "tsx tests/shape.test.ts",
     "test:smoke": "node tests/smoke.test.mjs",
     "preview": "vite preview"
   },
