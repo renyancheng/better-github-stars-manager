@@ -1,6 +1,7 @@
 import { authStore } from '@/auth/auth-store';
 import { githubStarSource } from '@/api/github-star-source';
 import { idbTagStore } from '@/storage/idb-tag-store';
+import { db } from '@/storage/db';
 import { queryStars, invalidateCache, type QueryParams, type QueryResult } from './query';
 import type { SyncProgress } from '@/types';
 
@@ -160,7 +161,11 @@ async function handle(req: Req): Promise<Res> {
       }
     }
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    const msg = e instanceof Error ? e.message : String(e);
+    // Reset progress to idle on failure so the UI doesn't stay stuck on
+    // "Fetching N pages…" when a sync throws (e.g. bad token, network).
+    setProgress({ phase: 'idle', done: 0, total: null, message: `✗ ${msg}` });
+    return { ok: false, error: msg };
   }
 }
 
@@ -172,3 +177,39 @@ chrome.runtime.onMessage.addListener((req: Req, _sender, sendResponse) => {
 chrome.runtime.onInstalled.addListener(() => {
   setProgress({ phase: 'idle', done: 0, total: null, message: '' });
 });
+
+/**
+ * Startup self-check: runs whenever the service worker wakes. Prints a single
+ * diagnostic line to the SW console so the user (opening "Inspect views:
+ * service worker") immediately sees token presence, GitHub HTTP status, and the
+ * live row count in the DB — without clicking anything. Throttled to once per
+ * 30s to avoid spamming on frequent SW wakeups.
+ */
+let lastSelfCheck = 0;
+async function selfCheck() {
+  const now = Date.now();
+  if (now - lastSelfCheck < 30_000) return;
+  lastSelfCheck = now;
+  const hasToken = await authStore.hasToken();
+  const starCount = await db.stars.count();
+  if (!hasToken) {
+    console.log('[GSM] no token configured | DB stars:', starCount, '| → open Options to add a PAT');
+    return;
+  }
+  try {
+    const token = await authStore.getToken();
+    const res = await fetch('https://api.github.com/user/starred?per_page=1&page=1', {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.star+json' },
+      cache: 'no-store',
+    });
+    const body = res.status === 200 ? await res.json() : null;
+    const sample = Array.isArray(body) && body[0]?.repo?.full_name ? body[0].repo.full_name : null;
+    console.log(
+      `[GSM] connection: HTTP ${res.status} | rate ${res.headers.get('x-ratelimit-remaining')}/${res.headers.get('x-ratelimit-limit')} | DB stars: ${starCount} | sample: ${sample ?? '—'}`,
+    );
+  } catch (e) {
+    console.log('[GSM] self-check fetch failed:', e instanceof Error ? e.message : String(e), '| DB stars:', starCount);
+  }
+}
+selfCheck();
+

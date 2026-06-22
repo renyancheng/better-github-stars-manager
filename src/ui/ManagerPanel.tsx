@@ -27,22 +27,28 @@ export function ManagerPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // On mount: read status first. Only auto-sync if a token is configured; if not,
-  // surface a clear "configure token" prompt instead of silently failing.
+  // On mount: read status first. If a token is configured, auto-sync — but pick
+  // full vs incremental based on whether the DB is empty (first use → full pull).
+  // Surface errors instead of swallowing them.
   useEffect(() => {
     let off = () => {};
     (async () => {
       const st = await bgCall<SyncStatus>('getStatus').catch(() => null);
       setStatus(st);
       if (st?.hasToken) {
-        // Token present → kick incremental sync. Surface errors (don't swallow).
-        bgCall('syncIncremental').catch(
-          (e) => setInfo(`✗ sync: ${e instanceof Error ? e.message : String(e)}`),
+        // Peek at the DB count to decide full vs incremental.
+        const q = await bgCall<{ grandTotal: number }>('query', {
+          params: { filter: emptyFilter(), offset: 0, limit: 1 },
+        }).catch(() => null);
+        const syncType = q && q.grandTotal > 0 ? 'syncIncremental' : 'syncFull';
+        bgCall(syncType).catch(
+          (e) => setInfo(`✗ ${syncType}: ${e instanceof Error ? e.message : String(e)}`),
         );
       }
       off = onProgress(() => bgCall<SyncStatus>('getStatus').then(setStatus));
     })();
     return () => off();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Keyboard shortcut: / focus search.
@@ -212,3 +218,16 @@ const btnStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 const selectStyle: React.CSSProperties = { ...btnStyle, padding: '2px 6px' };
+
+function emptyFilter() {
+  return {
+    query: '',
+    languages: [],
+    tags: [],
+    tagMode: 'any' as const,
+    showTombstone: false,
+    onlyUntagged: false,
+    sortKey: 'starred_at' as const,
+    sortDir: 'desc' as const,
+  };
+}
