@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { bgCall, onProgress, type SyncStatus } from '@/utils/messaging';
+import { Button } from '@/ui/shadcn/button';
+import { Separator } from '@/ui/shadcn/separator';
 
 interface ConnResult {
   status: number;
@@ -40,11 +42,7 @@ export function Popup() {
 
   const openStars = async () => {
     const u = await bgCall<{ username: string | null }>('getUsername');
-    if (u.username) {
-      chrome.tabs.create({ url: `https://github.com/${u.username}?tab=stars` });
-    } else {
-      chrome.tabs.create({ url: 'https://github.com/stars' });
-    }
+    chrome.tabs.create({ url: u.username ? `https://github.com/${u.username}?tab=stars` : 'https://github.com/stars' });
   };
 
   const openOptions = () => chrome.runtime.openOptionsPage();
@@ -76,64 +74,49 @@ export function Popup() {
   const hasToken = status?.hasToken;
 
   return (
-    <div style={{ padding: 16, fontFamily: 'system-ui, sans-serif', minWidth: 280 }}>
-      <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>⭐ GitHub Stars Manager</h2>
+    <div className="flex flex-col gap-2 p-3 font-sans" style={{ minWidth: 280 }}>
+      <h2 className="m-0 text-[15px] font-semibold text-foreground">⭐ Better GitHub Stars Manager</h2>
 
       {!hasToken && (
-        <div style={{ fontSize: 13, color: '#d29922', marginBottom: 10 }}>
+        <div className="flex items-center gap-2 text-[13px] text-warning">
           No token configured.
-          <button onClick={openOptions} style={{ marginLeft: 6 }}>
-            Add PAT
-          </button>
+          <Button variant="outline" size="sm" onClick={openOptions}>Add PAT</Button>
         </div>
       )}
 
-      <div style={{ fontSize: 12, color: '#8b949e', marginBottom: 10, minHeight: 18 }}>
+      <div className="min-h-[18px] text-xs text-muted-foreground">
         {p && p.phase !== 'idle' ? `${p.phase}: ${p.message}` : p?.message || 'Idle'}
       </div>
 
-      <div style={{ display: 'grid', gap: 6 }}>
-        <button disabled={busy || !hasToken} onClick={() => run('syncIncremental', 'Incremental sync')}>
+      <div className="grid gap-1.5">
+        <Button variant="outline" disabled={busy || !hasToken} onClick={() => run('syncIncremental', 'Incremental sync')}>
           Sync new stars (incremental)
-        </button>
-        <button disabled={busy || !hasToken} onClick={() => run('syncFull', 'Full sync')}>
+        </Button>
+        <Button variant="outline" disabled={busy || !hasToken} onClick={() => run('syncFull', 'Full sync')}>
           Full re-pull all stars
-        </button>
-        <button disabled={busy || !hasToken} onClick={() => run('syncRescan', 'Rescan')}>
+        </Button>
+        <Button variant="outline" disabled={busy || !hasToken} onClick={() => run('syncRescan', 'Rescan')}>
           Detect unstars (rescan)
-        </button>
-        <button disabled={busy || !hasToken} onClick={() => run('gistPull', 'Gist pull')}>
+        </Button>
+        <Button variant="outline" disabled={busy || !hasToken} onClick={() => run('gistPull', 'Gist pull')}>
           Pull tags from Gist
-        </button>
-        <button disabled={busy || !hasToken} onClick={() => run('gistPush', 'Gist push')}>
+        </Button>
+        <Button variant="outline" disabled={busy || !hasToken} onClick={() => run('gistPush', 'Gist push')}>
           Push tags to Gist
-        </button>
-        <hr style={{ border: 0, borderTop: '1px solid #30363d', margin: '4px 0' }} />
-        <button onClick={testConn} disabled={busy}>
-          🔌 Test GitHub connection
-        </button>
+        </Button>
+        <Separator className="my-1" />
+        <Button onClick={testConn} disabled={busy}>🔌 Test GitHub connection</Button>
         {connResult && (
-          <pre
-            style={{
-              fontSize: 10,
-              color: '#79c0ff',
-              background: '#161b22',
-              padding: 6,
-              borderRadius: 4,
-              margin: '4px 0',
-              whiteSpace: 'pre-wrap',
-              maxHeight: 150,
-              overflow: 'auto',
-            }}
-          >
+          <pre className="m-0 max-h-[150px] overflow-auto rounded border border-border bg-muted/40 p-1.5 text-[10px] text-foreground whitespace-pre-wrap">
             {connResult}
           </pre>
         )}
-        <button onClick={openStars}>Open my stars page</button>
-        <button onClick={openOptions}>Options…</button>
+        <Separator className="my-1" />
+        <Button variant="ghost" onClick={openStars}>Open my stars page</Button>
+        <Button variant="ghost" onClick={openOptions}>Options…</Button>
       </div>
 
-      {err && <div style={{ fontSize: 11, color: '#f85149', marginTop: 8 }}>{err}</div>}
+      {err && <div className="mt-1 text-[11px] text-destructive">{err}</div>}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 {
-  "name": "github-stars-manager",
+  "name": "better-github-stars-manager",
   "version": "0.1.0",
-  "description": "Manage your GitHub starred repos: tag, note, filter, search across 10k+ stars. UI injected into the stars page.",
+  "description": "Manage your GitHub starred repos: tag, note, filter, search across thousands of stars. UI injected into the stars page.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,11 +15,24 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@radix-ui/react-checkbox": "^1.3.5",
+    "@radix-ui/react-collapsible": "^1.1.14",
+    "@radix-ui/react-dialog": "^1.1.17",
+    "@radix-ui/react-label": "^2.1.10",
+    "@radix-ui/react-popover": "^1.1.17",
+    "@radix-ui/react-select": "^2.3.1",
+    "@radix-ui/react-separator": "^1.1.10",
+    "@radix-ui/react-slot": "^1.3.0",
     "@tanstack/react-virtual": "^3.10.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "dexie": "^4.0.10",
     "dexie-react-hooks": "^1.1.7",
+    "lucide-react": "^1.21.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss-animate": "^1.0.7",
     "zustand": "^4.5.5"
   },
   "devDependencies": {

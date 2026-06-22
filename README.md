@@ -1,8 +1,7 @@
-# GitHub Stars Manager
+# Better GitHub Stars Manager
 
 A Chrome extension (MV3) that turns your GitHub stars page into a searchable, taggable,
-filterable management surface — built for accounts with **thousands** of starred repos
-(the target user has ~9,900).
+filterable management surface — built for accounts with **thousands** of starred repos.
 
 It injects a full management UI into `github.com/{user}?tab=stars` (replacing the native
 paginated card list with a virtualized table of *all* your stars) and a tag chip into
@@ -14,10 +13,10 @@ every `github.com/{owner}/{repo}` page.
 
 ## What it does (MVP)
 
-- **Pull all your stars** into a local IndexedDB (authenticated `/user/starred`, ~99 pages).
+- **Pull all your stars** into a local IndexedDB (authenticated `/user/starred`, one request per ~100-star page).
 - **Incremental sync** on every visit to the stars page (1–2 requests, stops at the last-seen cursor).
 - **Full rescan** to detect unstars → soft-deleted (tombstoned) but your tags/notes are preserved.
-- **Virtualized table** of all stars (no pagination, scroll 9900 rows smoothly).
+- **Virtualized table** of all stars (no pagination, scroll smoothly through thousands of rows).
 - **Filter**: by language, by tag (any/all), full-text over name/description/topics, "untagged only", "show unstarred".
 - **Sort**: by starred date, repo update date, star count, or name.
 - **Tag + note** any repo inline; tags support soft dimension grouping.

@@ -63,6 +63,14 @@ export const authStore = {
     return (await read()).username;
   },
 
+  async getTheme(): Promise<'dark' | 'light'> {
+    return (await read()).theme;
+  },
+
+  async setTheme(theme: 'dark' | 'light'): Promise<void> {
+    await write({ ...(await read()), theme });
+  },
+
   /**
    * Verify a PAT against the GitHub API and persist it (encrypted) if valid.
    * Returns the username on success or throws with a descriptive error.

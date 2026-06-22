@@ -1,0 +1,34 @@
+import { useCallback, useEffect, useState } from 'react';
+import { authStore } from '@/auth/auth-store';
+
+/**
+ * Theme hook: runtime dark/light switching, persisted in chrome.storage (via
+ * authStore → gsm_config.theme).
+ *
+ * Unlike a standard shadcn setup that toggles `.dark` on `documentElement`, we
+ * return a className fragment ('dark' | '') so the CALLER attaches it to its
+ * own root element. In the stars-page content script that root lives inside a
+ * shadow root — toggling `documentElement` there would flip github.com's own
+ * dark mode, which we must not do. options/popup (own pages) can instead apply
+ * it to documentElement; this hook supports both via the returned className.
+ */
+export function useTheme() {
+  const [theme, setThemeState] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    authStore.getTheme().then((t) => setThemeState(t));
+  }, []);
+
+  const toggle = useCallback(() => {
+    setThemeState((cur) => {
+      const next = cur === 'dark' ? 'light' : 'dark';
+      authStore.setTheme(next); // fire-and-forget persist
+      return next;
+    });
+  }, []);
+
+  /** Attach this to the themed root element's className. */
+  const themeClass = theme === 'dark' ? 'dark' : '';
+
+  return { theme, themeClass, toggle };
+}

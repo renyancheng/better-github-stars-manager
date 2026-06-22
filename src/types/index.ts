@@ -1,5 +1,5 @@
 /**
- * Core domain types for GitHub Stars Manager.
+ * Core domain types for Better GitHub Stars Manager.
  *
  * Data model (from the grill blueprint):
  *  - `stars` store: GitHub repo metadata, rebuildable from the API, NOT synced to Gist.

@@ -20,14 +20,14 @@ correctness is covered by `tests/logic.test.ts` (run with `node --experimental-s
 ## 2. First full sync
 
 - [ ] Popup → "Full re-pull all stars" → progress shows "Fetching N pages…"
-- [ ] For a ~9900-star account: completes in seconds (99 requests, within 5000/h limit)
+- [ ] For an account with thousands of stars: completes quickly (one request per ~100-star page, within the 5000/h limit)
 - [ ] Service worker console: no 401/403/rate-limit errors
-- [ ] IndexedDB (Application tab → IndexedDB → github-stars-manager → stars) shows ~9900 rows
+- [ ] IndexedDB (Application tab → IndexedDB → better-github-stars-manager → stars) shows all your starred repos
 
 ## 3. Stars management page
 
 - [ ] Navigate to `github.com/{you}?tab=stars` → management panel renders full-screen, native GitHub list is covered
-- [ ] Header shows "{filtered} / {total}" with total ≈ 9900
+- [ ] Header shows "{filtered} / {total}" with total matching your star count
 - [ ] Scroll is smooth through all rows (virtualization: only ~20 DOM rows exist at a time)
 - [ ] `/` focuses the search box; typing filters name/desc/topics
 - [ ] Language checkboxes in sidebar filter the list

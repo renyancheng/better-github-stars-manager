@@ -1,27 +1,60 @@
+import tailwindcssAnimate from 'tailwindcss-animate';
+
 /** @type {import('tailwindcss').Config} */
 export default {
-  // The stars-page UI is injected into a shadow root so GitHub's CSS won't clash.
-  // Tailwind needs to scan our own source files; the repo-chip is also shadow-scoped.
+  darkMode: ['class'],
   content: ['./src/**/*.{ts,tsx,html}'],
-  // Do not use Tailwind's `preflight` (reset): it would reset GitHub's page when
-  // injected into the light DOM. Our UIs live in shadow roots with their own resets.
-  corePlugins: { preflight: false },
+  // preflight ON: shadcn components depend on it. Safe because the content
+  // script's Tailwind CSS is injected into a SHADOW ROOT via `?inline`
+  // (adoptedStyleSheets), NOT into the github.com light DOM — so preflight's
+  // global reset is scoped to the shadow boundary. options/popup are the
+  // extension's own pages, also safe.
+  corePlugins: { preflight: true },
   theme: {
     extend: {
       colors: {
-        // GitHub-like palette so the injected UI feels native
-        gh: {
-          canvas: '#0d1117',
-          subtle: '#161b22',
-          border: '#30363d',
-          text: '#c9d1d9',
-          muted: '#8b949e',
-          accent: '#2f81f7',
-          success: '#3fb950',
-          danger: '#f85149',
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        primary: {
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
         },
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
+        success: 'hsl(var(--success))',
+        warning: 'hsl(var(--warning))',
+      },
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
       },
     },
   },
-  plugins: [],
+  plugins: [tailwindcssAnimate],
 };

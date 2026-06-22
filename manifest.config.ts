@@ -9,7 +9,7 @@ import pkg from './package.json';
  */
 export default defineManifest({
   manifest_version: 3,
-  name: 'GitHub Stars Manager',
+  name: 'Better GitHub Stars Manager',
   version: pkg.version,
   description: pkg.description,
   permissions: ['storage'],
@@ -20,7 +20,7 @@ export default defineManifest({
   },
   action: {
     default_popup: 'src/popup/index.html',
-    default_title: 'GitHub Stars Manager',
+    default_title: 'Better GitHub Stars Manager',
   },
   options_ui: {
     page: 'src/options/index.html',

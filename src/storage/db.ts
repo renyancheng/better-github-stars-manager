@@ -19,7 +19,7 @@ export class StarsDB extends Dexie {
   tagMeta!: Table<TagMeta, string>;
 
   constructor() {
-    super('github-stars-manager');
+    super('better-github-stars-manager');
     this.version(1).stores({
       stars: 'full_name, language, starred_at, pushed_at, tombstone',
       tags: 'full_name, *tags, mtime',

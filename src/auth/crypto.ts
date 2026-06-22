@@ -14,7 +14,7 @@ import type { CryptoMeta } from '@/types';
  * personal-first scope (Q2=C).
  */
 
-const APP_SECRET = 'github-stars-manager/v1/static-derivation-secret';
+const APP_SECRET = 'better-github-stars-manager/v1/static-derivation-secret';
 const PBKDF2_ITERS = 150_000;
 const KEY_LEN = 256;
 

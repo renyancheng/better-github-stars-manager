@@ -21,8 +21,8 @@ import { clearDirty } from '@/storage/idb-tag-store';
  * We create a dedicated gist for sync to limit blast radius.
  */
 
-const GIST_FILENAME = 'github-stars-manager-tags.json';
-const GIST_DESC = 'GitHub Stars Manager — tag sync (do not edit)';
+const GIST_FILENAME = 'better-github-stars-manager-tags.json';
+const GIST_DESC = 'Better GitHub Stars Manager — tag sync (do not edit)';
 
 function gistHeaders(): Promise<HeadersInit> {
   return authStore.getToken().then((token) => {

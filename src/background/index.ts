@@ -3,6 +3,7 @@ import { githubStarSource } from '@/api/github-star-source';
 import { idbTagStore } from '@/storage/idb-tag-store';
 import { db } from '@/storage/db';
 import { queryStars, invalidateCache, type QueryParams, type QueryResult } from './query';
+import { suggestTags } from '@/ui/suggest';
 import type { SyncProgress } from '@/types';
 
 /**
@@ -18,6 +19,7 @@ type Req =
   | { type: 'syncIncremental' }
   | { type: 'syncFull' }
   | { type: 'syncRescan' }
+  | { type: 'refreshTags' }
   | { type: 'gistPush' }
   | { type: 'gistPull' }
   | { type: 'getStatus' }
@@ -59,29 +61,62 @@ async function run<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * Auto-tag every star from its language + topics. Pure-local: no API calls —
+ * it only reads star.language/star.topics (already in IDB from sync) and writes
+ * the tags store. Idempotent (suggestTags dedupes against existing tags, and we
+ * only write when the merged set actually grew). Preserves notes (setTags
+ * spreads existing). This runs automatically after every sync so tags are
+ * always populated without a manual button press; the button is a manual refresh.
+ */
+async function autoTagAll(): Promise<{ tagged: number }> {
+  const stars = await db.stars.toArray();
+  let tagged = 0;
+  for (const star of stars) {
+    const existing = (await idbTagStore.get(star.full_name))?.tags ?? [];
+    const toAdd = suggestTags(star, existing);
+    if (toAdd.length === 0) continue;
+    const merged = Array.from(new Set([...existing, ...toAdd]));
+    if (merged.length !== existing.length) {
+      await idbTagStore.setTags(star.full_name, merged);
+      tagged++;
+    }
+  }
+  return { tagged };
+}
+
 async function handle(req: Req): Promise<Res> {
   try {
     switch (req.type) {
       case 'syncIncremental': {
         if (!(await authStore.hasToken())) return { ok: false, error: 'No token configured' };
         const r = await run(() => githubStarSource.syncIncremental());
+        const t = await autoTagAll();
         broadcastDataChanged();
-        setProgress({ phase: 'idle', done: 0, total: null, message: `+${r.added} new` });
-        return { ok: true, data: r };
+        setProgress({ phase: 'idle', done: 0, total: null, message: `+${r.added} new · ${t.tagged} auto-tagged` });
+        return { ok: true, data: { ...r, autoTagged: t.tagged } };
       }
       case 'syncFull': {
         if (!(await authStore.hasToken())) return { ok: false, error: 'No token configured' };
         const r = await run(() => githubStarSource.syncFull((p) => setProgress(p)));
+        const t = await autoTagAll();
         broadcastDataChanged();
-        setProgress({ phase: 'idle', done: 0, total: null, message: 'Full sync done' });
-        return { ok: true, data: r };
+        setProgress({ phase: 'idle', done: 0, total: null, message: `Full sync done · ${t.tagged} auto-tagged` });
+        return { ok: true, data: { ...r, autoTagged: t.tagged } };
       }
       case 'syncRescan': {
         if (!(await authStore.hasToken())) return { ok: false, error: 'No token configured' };
         const r = await run(() => githubStarSource.syncRescan((p) => setProgress(p)));
+        const t = await autoTagAll();
         broadcastDataChanged();
-        setProgress({ phase: 'idle', done: 0, total: null, message: 'Rescan done' });
-        return { ok: true, data: r };
+        setProgress({ phase: 'idle', done: 0, total: null, message: `Rescan done · ${t.tagged} auto-tagged` });
+        return { ok: true, data: { ...r, autoTagged: t.tagged } };
+      }
+      case 'refreshTags': {
+        const t = await autoTagAll();
+        broadcastDataChanged();
+        setProgress({ phase: 'idle', done: 0, total: null, message: `Refreshed · ${t.tagged} tagged` });
+        return { ok: true, data: t };
       }
       case 'gistPush':
         return { ok: true, data: await idbTagStore.syncPush() };

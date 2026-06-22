@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * GitHub-native black/white theme. #181717 (= hsl 0 0% 9%) is the signature
+ * primary; hover inversion (primary ↔ background) echoes the reference button.
+ * Semantic colors (success/warning/destructive) stay but muted, so the palette
+ * reads as a calm data tool rather than a rainbow.
+ */
+@layer base {
+  /* :host covers the shadow-root case: the stars-page panel lives inside a
+     shadow root, where :root does NOT match the panel. Defining the variables
+     on :host (the shadow host) lets them inherit into the panel for BOTH
+     themes — without this, light theme's vars are undefined inside the shadow
+     and bg-background falls back to transparent, leaking the page behind. */
+  :root,
+  :host {
+    /* light — white canvas, near-black ink */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%; /* #181717 */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 0 0% 9%; /* #181717 black button */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 9%;
+    --radius: 0.375rem;
+  }
+
+  .dark {
+    /* dark — #181717 canvas, near-white ink */
+    --background: 0 0% 9%; /* #181717 signature black */
+    --foreground: 0 0% 98%;
+    --card: 0 0% 11%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 11%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%; /* white button (inverted) */
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Hide the scrollbar visually while keeping the element scrollable.
+     Used on the virtual list so its thumb (which can drift with estimateSize)
+     doesn't show — wheel/trackpad scrolling still works. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Drawer slide-in/out: width + opacity. The detail drawer container is
+     always mounted; we toggle this class so React doesn't unmount mid-exit. */
+  .drawer-enter {
+    width: 340px;
+    opacity: 1;
+  }
+  .drawer-exit {
+    width: 0;
+    opacity: 0;
+  }
+  .drawer-anim {
+    transition:
+      width 180ms cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 150ms ease;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* Active-filter row: animate height via grid-template-rows 0fr→1fr so the
+     row grows/shrinks smoothly without a fixed max-height. Inner content is
+     overflow:hidden so the 0fr state collapses fully. */
+  .filter-row-anim {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 150ms ease;
+  }
+  .filter-row-anim.collapsed {
+    grid-template-rows: 0fr;
+  }
+  .filter-row-anim > * {
+    overflow: hidden;
+  }
+}

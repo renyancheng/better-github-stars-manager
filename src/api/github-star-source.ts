@@ -121,15 +121,19 @@ export function toStar(it: StarredRepoPayload): Star {
   };
 }
 
-/** Concurrently fetch a range of pages, bounded to avoid hammering the API. */
+/** Concurrently fetch a range of pages, bounded to avoid hammering the API.
+ *  Results are returned in INPUT order (by page number), not completion order,
+ *  so callers that depend on ordering (e.g. newest-first cursor) stay correct. */
 async function fetchPages(pages: number[], concurrency = 6): Promise<StarredRepoPayload[][]> {
-  const out: StarredRepoPayload[][] = [];
+  const out: StarredRepoPayload[][] = new Array(pages.length);
   let idx = 0;
   const workers = Array.from({ length: Math.min(concurrency, pages.length) }, async () => {
     while (idx < pages.length) {
-      const my = pages[idx++];
+      const my = pages[idx];
+      const slot = idx;
+      idx++;
       const { items } = await fetchPage(my);
-      out.push(items);
+      out[slot] = items; // place by input index, not push-by-completion
     }
   });
   await Promise.all(workers);
@@ -170,11 +174,15 @@ export const githubStarSource: StarSource = {
     let added = 0;
     let page = 1;
     let stop = false;
+    let newestStarredAt: string | null = null;
     // Walk pages in starred_at-desc order; stop when we see a repo at/before the cursor.
     while (!stop && page <= 5) {
       // Cap at 5 pages: if more than ~500 new stars since last sync, the user can run full.
       const { items } = await fetchPage(page);
       if (items.length === 0) break;
+      // Page 1 (first iteration) holds the newest starred_at — capture it as the
+      // next cursor WITHOUT a redundant extra fetch.
+      if (page === 1) newestStarredAt = items[0]?.starred_at ?? newestStarredAt;
       const fresh = cursor ? items.filter((it) => it.starred_at > cursor) : items;
       if (fresh.length > 0) {
         await db.stars.bulkPut(fresh.map(toStar));
@@ -185,9 +193,8 @@ export const githubStarSource: StarSource = {
       if (fresh.length < items.length) stop = true;
       page++;
     }
-    // Advance cursor to the newest we saw.
-    const { items: top } = await fetchPage(1);
-    if (top[0]) await authStore.update({ lastSyncStarredAt: top[0].starred_at });
+    // Advance cursor to the newest we saw this run.
+    if (newestStarredAt) await authStore.update({ lastSyncStarredAt: newestStarredAt });
     return { added };
   },
 

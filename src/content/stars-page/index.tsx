@@ -1,39 +1,106 @@
 import { createRoot } from 'react-dom/client';
 import { ManagerPanel } from '@/ui/ManagerPanel';
+import cssText from '@/ui/styles.css?inline';
 
 /**
  * stars-page content script (Task #7, Q6=B).
  *
- * On github.com/{user}?tab=stars (matched by URL gate below — MV3 match patterns
- * can't target query strings), we inject a full-width management panel that
- * replaces the native paginated card list with a virtualized table of all ~9900
- * stars. A single stable container is the only coupling to GitHub's DOM; the
- * panel's internals are fully self-managed (low reversion risk per the grill).
+ * Injects a full-screen management panel that replaces the native starred list
+ * with a virtualized table. Mounted inside a SHADOW ROOT so the extension's
+ * Tailwind/preflight CSS (loaded via `?inline` → adoptedStyleSheets) is fully
+ * isolated from github.com's light DOM — GitHub's own styles never clash, and
+ * our preflight never leaks onto the page.
+ *
+ * `?inline` is critical: a normal `import './styles.css'` would be picked up
+ * by CRXJS's content-script CSS plugin and injected into the page <head> (light
+ * DOM), leaking preflight across github.com. `?inline` returns the CSS string
+ * only, which we attach inside the shadow boundary.
+ *
+ * MV3 match patterns can't target query strings, so we gate on `?tab=stars`.
  */
-
 function isStarsPage(): boolean {
   return new URLSearchParams(location.search).get('tab') === 'stars';
 }
 
-function injectPanel(): void {
-  if (!isStarsPage()) return;
-  if (document.getElementById('gsm-manager-root')) return; // idempotent
+// --- Page scroll lock ---
+// The panel is a full-screen fixed overlay. If the underlying page body keeps
+// scrolling, its scrollbar thumb tracks the page (not the panel's virtual list),
+// which looks broken. We lock html+body overflow while the panel is mounted and
+// restore the original values when it's removed (e.g. navigating away from
+// ?tab=stars). Idempotent: re-locking stores the already-saved originals only once.
+let savedHtmlOverflow: string | null = null;
+let savedBodyOverflow: string | null = null;
 
-  // Find a stable anchor near the page main content. We create our own container
-  // and insert it after the page header, hiding the native starred list + pagination.
-  const main = document.querySelector('main') ?? document.querySelector('[data-pjax-container]') ?? document.body;
-  const host = document.createElement('div');
-  host.id = 'gsm-manager-root';
-  host.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483000;background:#0d1117;';
-
-  // Hide GitHub's native chrome behind us (we're full-screen overlay).
-  main.parentElement?.insertBefore(host, main);
-
-  createRoot(host).render(<ManagerPanel />);
+function lockPageScroll(): void {
+  if (savedHtmlOverflow === null) savedHtmlOverflow = document.documentElement.style.overflow;
+  if (savedBodyOverflow === null) savedBodyOverflow = document.body.style.overflow;
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';
 }
 
-// GitHub uses Turbo/PJAX; re-inject on navigation.
-injectPanel();
-document.addEventListener('turbo:load', injectPanel);
-document.addEventListener('turbo:render', injectPanel);
-window.addEventListener('popstate', injectPanel);
+function unlockPageScroll(): void {
+  document.documentElement.style.overflow = savedHtmlOverflow ?? '';
+  document.body.style.overflow = savedBodyOverflow ?? '';
+  savedHtmlOverflow = null;
+  savedBodyOverflow = null;
+}
+
+function injectPanel(): void {
+  if (!isStarsPage()) return;
+  if (document.getElementById('gsm-manager-host')) return; // idempotent
+
+  // Full-screen overlay host (kept in the light DOM for positioning); the
+  // actual UI + styles live inside its shadow root.
+  const host = document.createElement('div');
+  host.id = 'gsm-manager-host';
+  host.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483000;';
+
+  // Lock the underlying page scroll. The panel is a full-screen fixed overlay,
+  // so the page body should NOT scroll — if it can, its scrollbar shows a thumb
+  // that tracks the page (not the panel's virtual list), which looks broken.
+  // We pin html+body to overflow:hidden for the panel's lifetime.
+  lockPageScroll();
+
+  const shadow = host.attachShadow({ mode: 'open' });
+  // Adopt the Tailwind CSS into the shadow root (isolated from the page).
+  try {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(cssText);
+    shadow.adoptedStyleSheets = [sheet];
+  } catch {
+    // Fallback: older browsers without constructable stylesheets.
+    const styleEl = document.createElement('style');
+    styleEl.textContent = cssText;
+    shadow.appendChild(styleEl);
+  }
+
+  // Inner root carries the theme class (.dark / none) — NOT documentElement,
+  // which would toggle github.com's own dark mode.
+  const root = document.createElement('div');
+  root.id = 'gsm-manager-root';
+  root.style.cssText = 'width:100%;height:100%;';
+  shadow.appendChild(root);
+
+  // Insert the host, hiding GitHub's native chrome behind the overlay.
+  const main = document.querySelector('main') ?? document.querySelector('[data-pjax-container]') ?? document.body;
+  main.parentElement?.insertBefore(host, main);
+
+  createRoot(root).render(<ManagerPanel />);
+}
+
+// GitHub uses Turbo/PJAX; re-inject on navigation. If we navigated AWAY from
+// the stars page, remove the overlay and restore page scrolling.
+function sync(): void {
+  const host = document.getElementById('gsm-manager-host');
+  if (isStarsPage()) {
+    injectPanel();
+  } else if (host) {
+    host.remove();
+    unlockPageScroll();
+  }
+}
+
+sync();
+document.addEventListener('turbo:load', sync);
+document.addEventListener('turbo:render', sync);
+window.addEventListener('popstate', sync);

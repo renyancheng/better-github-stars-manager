@@ -62,14 +62,25 @@ function buildChip(full_name: string, tag: Tag | undefined): { el: HTMLElement; 
   style.textContent = `
     :host { all: initial; }
     .chip { display:inline-flex; align-items:center; gap:2px; font:12px/1.4 -apple-system,system-ui,sans-serif; }
-    .tag { display:inline-block; padding:1px 7px; border-radius:10px; background:#1f6feb33; color:#79c0ff; cursor:pointer; border:1px solid #1f6feb55; }
-    .tag:hover { background:#1f6feb55; }
-    .none { color:#8b949e; font-style:italic; font-size:11px; }
-    .edit { cursor:pointer; color:#8b949e; border:1px solid #30363d; border-radius:4px; padding:0 4px; font-size:11px; }
-    .edit:hover { color:#c9d1d9; border-color:#8b949e; }
+    /* Black/white tag chip — follows the page's color scheme so it matches
+       github.com's own light/dark mode (we don't force our panel theme here). */
+    .tag { display:inline-block; padding:1px 7px; border-radius:10px; background:rgba(24,23,23,0.08); color:#181717; cursor:pointer; border:1px solid rgba(24,23,23,0.25); }
+    .tag:hover { background:rgba(24,23,23,0.15); }
+    .none { color:#57606a; font-style:italic; font-size:11px; }
+    .edit { cursor:pointer; color:#57606a; border:1px solid #d0d7de; border-radius:4px; padding:0 4px; font-size:11px; }
+    .edit:hover { color:#181717; border-color:#8c959f; }
     .editor { display:flex; gap:4px; align-items:center; }
-    .editor input { font:12px monospace; padding:2px 6px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; width:180px; }
-    .editor button { font:11px system-ui; padding:2px 6px; background:#238636; color:#fff; border:0; border-radius:4px; cursor:pointer; }
+    .editor input { font:12px monospace; padding:2px 6px; background:#ffffff; color:#181717; border:1px solid #d0d7de; border-radius:4px; width:180px; }
+    .editor button { font:11px system-ui; padding:2px 6px; background:#181717; color:#fff; border:0; border-radius:4px; cursor:pointer; }
+    @media (prefers-color-scheme: dark) {
+      .tag { background:rgba(255,255,255,0.10); color:#e6edf3; border-color:rgba(255,255,255,0.25); }
+      .tag:hover { background:rgba(255,255,255,0.18); }
+      .none { color:#8b949e; }
+      .edit { color:#8b949e; border-color:#30363d; }
+      .edit:hover { color:#e6edf3; border-color:#8b949e; }
+      .editor input { background:#0d1117; color:#c9d1d9; border-color:#30363d; }
+      .editor button { background:#e6edf3; color:#0d1117; }
+    }
   `;
   root.appendChild(style);
   const box = document.createElement('div');
