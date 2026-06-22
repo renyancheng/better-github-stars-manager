@@ -1,0 +1,44 @@
+import { defineManifest } from '@crxjs/vite-plugin';
+import pkg from './package.json';
+
+/**
+ * MV3 match patterns cannot match on query strings (no `?tab=stars` patterns).
+ * So both content scripts match the broad host and gate on URL inside the script:
+ *  - stars-page runs only when location.search includes `tab=stars`
+ *  - repo-chip  runs only on paths shaped `/{owner}/{repo}` (excluded stars/settings/etc.)
+ */
+export default defineManifest({
+  manifest_version: 3,
+  name: 'GitHub Stars Manager',
+  version: pkg.version,
+  description: pkg.description,
+  permissions: ['storage'],
+  host_permissions: ['https://api.github.com/*', 'https://github.com/*'],
+  background: {
+    service_worker: 'src/background/index.ts',
+    type: 'module',
+  },
+  action: {
+    default_popup: 'src/popup/index.html',
+    default_title: 'GitHub Stars Manager',
+  },
+  options_ui: {
+    page: 'src/options/index.html',
+    open_in_tab: true,
+  },
+  content_scripts: [
+    {
+      matches: ['https://github.com/*'],
+      js: ['src/content/stars-page/index.tsx'],
+      run_at: 'document_idle',
+    },
+    {
+      matches: ['https://github.com/*'],
+      js: ['src/content/repo-chip/index.tsx'],
+      run_at: 'document_idle',
+    },
+  ],
+  // web_accessible_resources: needed if we ever load an iframe for the manager UI,
+  // but we mount into the page DOM directly, so none required for MVP.
+  web_accessible_resources: [],
+});
