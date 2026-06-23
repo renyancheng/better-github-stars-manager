@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
-import { bgCall, onProgress, type SyncStatus } from '@/utils/messaging';
+import { Star, Plug, FlaskConical } from 'lucide-react';
+import { bgCall, mergeProgressStatus, mergeStatusSnapshot, onProgress, type SyncStatus } from '@/utils/messaging';
 import { Button } from '@/ui/shadcn/button';
+import { Progress } from '@/ui/shadcn/progress';
 import { Separator } from '@/ui/shadcn/separator';
+import { Spinner } from '@/ui/shadcn/spinner';
+import { useI18n } from '@/i18n';
 
 interface ConnResult {
   status: number;
@@ -13,30 +17,50 @@ interface ConnResult {
   sample: string | null;
 }
 
+interface DebugResult {
+  hasUsableToken: boolean;
+  hasStoredCipher: boolean;
+  hasCryptoMeta: boolean;
+  username: string | null;
+  lastSyncStarredAt: string | null;
+  gistId: string | null;
+  starCount: number;
+  liveStarCount: number;
+  tombstoneCount: number;
+  newestSample: string | null;
+}
+
 export function Popup() {
   const [status, setStatus] = useState<SyncStatus | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [connResult, setConnResult] = useState<string | null>(null);
+  const [debugResult, setDebugResult] = useState<string | null>(null);
+  const { m } = useI18n();
 
-  const refresh = () => bgCall<SyncStatus>('getStatus').then(setStatus).catch(() => {});
+  const refresh = () =>
+    bgCall<SyncStatus>('getStatus')
+      .then((next) => setStatus((current) => mergeStatusSnapshot(current, next)))
+      .catch(() => {});
 
   useEffect(() => {
     refresh();
-    const off = onProgress(() => refresh());
+    const off = onProgress((progress) => {
+      setStatus((current) => mergeProgressStatus(current, progress));
+    });
     return off;
   }, []);
 
   const run = async (type: string, label: string) => {
-    setBusy(true);
+    setPendingAction(type);
     setErr(null);
     try {
       await bgCall(type);
       await refresh();
     } catch (e) {
-      setErr(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
+      setErr(m.popup.failed(label, e instanceof Error ? e.message : String(e)));
     } finally {
-      setBusy(false);
+      setPendingAction((cur) => (cur === type ? null : cur));
     }
   };
 
@@ -48,72 +72,120 @@ export function Popup() {
   const openOptions = () => chrome.runtime.openOptionsPage();
 
   const testConn = async () => {
-    setBusy(true);
-    setConnResult('testing…');
+    setPendingAction('testConnection');
+    setConnResult(m.popup.testing);
     try {
       const r = await bgCall<ConnResult>('testConnection');
       let text =
         `HTTP ${r.status} ${r.statusText}\n` +
-        `rate: ${r.remaining}/${r.limit} remaining\n` +
-        `scopes: ${r.scopes ?? '(fine-grained: none shown)'}\n` +
-        `items on page 1: ${r.itemCount}\n` +
-        `sample: ${r.sample ?? '—'}`;
-      if (r.status === 200 && r.itemCount > 0) text = `✅ OK — connection works\n${text}`;
-      else if (r.status === 204) text = `⚠️ 204 No Content — token may lack /user/starred access\n${text}`;
-      else if (r.status === 401) text = `❌ 401 — token rejected\n${text}`;
-      else if (r.status === 403) text = `❌ 403 — forbidden (check scopes / repository access)\n${text}`;
+        `${m.popup.rate(r.remaining, r.limit)}\n` +
+        `${m.popup.scopes(r.scopes)}\n` +
+        `${m.popup.itemsOnPage(r.itemCount)}\n` +
+        `${m.popup.sample(r.sample)}`;
+      if (r.status === 200 && r.itemCount > 0) text = `${m.popup.connectionOk}\n${text}`;
+      else if (r.status === 204) text = `${m.popup.connectionNoContent}\n${text}`;
+      else if (r.status === 401) text = `${m.popup.connectionRejected}\n${text}`;
+      else if (r.status === 403) text = `${m.popup.connectionForbidden}\n${text}`;
       setConnResult(text);
     } catch (e) {
-      setConnResult(`✗ ${e instanceof Error ? e.message : String(e)}`);
+      setConnResult(`${e instanceof Error ? e.message : String(e)}`);
     } finally {
-      setBusy(false);
+      setPendingAction((cur) => (cur === 'testConnection' ? null : cur));
+    }
+  };
+
+  const showDebug = async () => {
+    setPendingAction('debugState');
+    setDebugResult(m.common.loading);
+    try {
+      const r = await bgCall<DebugResult>('getDebugStatus');
+      setDebugResult(JSON.stringify(r, null, 2));
+    } catch (e) {
+      setDebugResult(`${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setPendingAction((cur) => (cur === 'debugState' ? null : cur));
     }
   };
 
   const p = status?.progress;
   const hasToken = status?.hasToken;
+  const syncing = !!(p && p.phase !== 'idle');
+  const actionBusy = syncing || pendingAction !== null;
+  const progressValue = p?.total ? Math.max(1, Math.min(100, Math.round((p.done / p.total) * 100))) : null;
+  const progressCount = p?.total ? `${p.done}/${p.total}` : null;
+  const buttonLabel = (label: string, active: boolean, icon?: React.ReactNode) =>
+    active ? (
+      <>
+        <Spinner data-icon="inline-start" />
+        {label}
+        {progressCount && <span className="ml-1 tabular-nums text-[10px] opacity-80">{progressCount}</span>}
+      </>
+    ) : (
+      <>
+        {icon}
+        {label}
+      </>
+    );
 
   return (
     <div className="flex flex-col gap-2 p-3 font-sans" style={{ minWidth: 280 }}>
-      <h2 className="m-0 text-[15px] font-semibold text-foreground">⭐ Better GitHub Stars Manager</h2>
+      <h2 className="m-0 inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground">
+        <Star className="size-4 fill-current text-primary" />
+        {m.popup.title}
+      </h2>
 
       {!hasToken && (
         <div className="flex items-center gap-2 text-[13px] text-warning">
-          No token configured.
-          <Button variant="outline" size="sm" onClick={openOptions}>Add PAT</Button>
+          {m.popup.noToken}
+          <Button variant="outline" size="sm" onClick={openOptions}>{m.popup.addPat}</Button>
         </div>
       )}
 
-      <div className="min-h-[18px] text-xs text-muted-foreground">
-        {p && p.phase !== 'idle' ? `${p.phase}: ${p.message}` : p?.message || 'Idle'}
+      <div className="flex min-h-[18px] flex-col gap-1 text-xs text-muted-foreground">
+        <div className="inline-flex items-center gap-2">
+          {syncing && <Spinner className="size-3" />}
+          {p && p.phase !== 'idle' ? `${m.common.phase(p.phase)}: ${p.message}` : p?.message || m.popup.idle}
+        </div>
+        {syncing && progressValue != null && (
+          <div className="flex items-center gap-2">
+            <Progress value={progressValue} className="h-2 flex-1" />
+            <span className="min-w-[48px] text-right tabular-nums text-foreground">{progressCount}</span>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-1.5">
-        <Button variant="outline" disabled={busy || !hasToken} onClick={() => run('syncIncremental', 'Incremental sync')}>
-          Sync new stars (incremental)
+        <Button variant="outline" disabled={actionBusy || !hasToken} onClick={() => void run('syncIncremental', m.popup.syncIncremental)}>
+          {buttonLabel(m.popup.syncIncremental, pendingAction === 'syncIncremental')}
         </Button>
-        <Button variant="outline" disabled={busy || !hasToken} onClick={() => run('syncFull', 'Full sync')}>
-          Full re-pull all stars
+        <Button variant="outline" disabled={actionBusy || !hasToken} onClick={() => void run('syncFull', m.popup.syncFull)}>
+          {buttonLabel(m.popup.syncFull, pendingAction === 'syncFull')}
         </Button>
-        <Button variant="outline" disabled={busy || !hasToken} onClick={() => run('syncRescan', 'Rescan')}>
-          Detect unstars (rescan)
+        <Button variant="outline" disabled={actionBusy || !hasToken} onClick={() => void run('syncRescan', m.popup.reconcile)}>
+          {buttonLabel(m.popup.reconcile, pendingAction === 'syncRescan')}
         </Button>
-        <Button variant="outline" disabled={busy || !hasToken} onClick={() => run('gistPull', 'Gist pull')}>
-          Pull tags from Gist
+        <Button variant="outline" disabled={actionBusy || !hasToken} onClick={() => void run('gistPull', m.popup.gistPull)}>
+          {buttonLabel(m.popup.gistPull, pendingAction === 'gistPull')}
         </Button>
-        <Button variant="outline" disabled={busy || !hasToken} onClick={() => run('gistPush', 'Gist push')}>
-          Push tags to Gist
+        <Button variant="outline" disabled={actionBusy || !hasToken} onClick={() => void run('gistPush', m.popup.gistPush)}>
+          {buttonLabel(m.popup.gistPush, pendingAction === 'gistPush')}
         </Button>
         <Separator className="my-1" />
-        <Button onClick={testConn} disabled={busy}>🔌 Test GitHub connection</Button>
+        <Button onClick={() => void testConn()} disabled={actionBusy}>{buttonLabel(m.popup.testConnection, pendingAction === 'testConnection', <Plug className="size-4" data-icon="inline-start" />)}</Button>
         {connResult && (
           <pre className="m-0 max-h-[150px] overflow-auto rounded border border-border bg-muted/40 p-1.5 text-[10px] text-foreground whitespace-pre-wrap">
             {connResult}
           </pre>
         )}
+        <Button onClick={() => void showDebug()} disabled={actionBusy}>{buttonLabel(m.popup.debugState, pendingAction === 'debugState', <FlaskConical className="size-4" data-icon="inline-start" />)}</Button>
+        {debugResult && (
+          <pre className="m-0 max-h-[180px] overflow-auto rounded border border-border bg-muted/40 p-1.5 text-[10px] text-foreground whitespace-pre-wrap">
+            {debugResult}
+          </pre>
+        )}
         <Separator className="my-1" />
-        <Button variant="ghost" onClick={openStars}>Open my stars page</Button>
-        <Button variant="ghost" onClick={openOptions}>Options…</Button>
+        <Button variant="ghost" onClick={openStars}>{m.popup.openStars}</Button>
+        <Button variant="ghost" onClick={openOptions}>{m.popup.options}</Button>
       </div>
 
       {err && <div className="mt-1 text-[11px] text-destructive">{err}</div>}

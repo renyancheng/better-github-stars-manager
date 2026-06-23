@@ -1,7 +1,9 @@
 import { memo } from 'react';
+import { Archive, Star as StarIcon, StickyNote } from 'lucide-react';
 import type { Star, Tag } from '@/types';
 import { Badge } from '@/ui/shadcn/badge';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n';
 
 /**
  * Compact scan-optimized list row. Fixed height h-16 (64px) — MUST stay 64 to
@@ -35,6 +37,7 @@ export const StarRow = memo(function StarRow({
   const overflow = myTags.length > COMPACT_VISIBLE;
   const visible = overflow ? myTags.slice(0, COMPACT_VISIBLE) : myTags;
   const hiddenCount = myTags.length - visible.length;
+  const { m } = useI18n();
 
   return (
     <div
@@ -51,22 +54,24 @@ export const StarRow = memo(function StarRow({
       {/* Repo name + status icons */}
       <div className="flex items-center gap-1 overflow-hidden">
         <span className="truncate text-primary">{star.full_name}</span>
-        {star.archived && <span className="shrink-0 text-warning" title="archived">📦</span>}
-        {star.tombstone && <span className="shrink-0 text-destructive" title="unstarred">⊘</span>}
+        {star.archived && <Archive className="size-3 shrink-0 text-warning" aria-label={m.starRow.archived} />}
       </div>
 
       {/* Description */}
       <div className="truncate text-xs text-muted-foreground">
-        {star.description || <span className="text-muted-foreground/60">—</span>}
+        {star.description || <span className="text-muted-foreground/60">{m.common.none}</span>}
       </div>
 
       {/* Language */}
       <div className="truncate text-xs text-primary">
-        {star.language ?? <span className="text-muted-foreground/60">—</span>}
+        {star.language ?? <span className="text-muted-foreground/60">{m.common.none}</span>}
       </div>
 
       {/* Stars */}
-      <div className="text-right text-xs text-muted-foreground">★{fmt(star.stargazers_count)}</div>
+      <div className="flex items-center justify-end gap-0.5 text-xs text-muted-foreground">
+        <StarIcon className="size-3 fill-current" />
+        <span className="tabular-nums">{fmt(star.stargazers_count)}</span>
+      </div>
 
       {/* Updated */}
       <div className="text-xs text-muted-foreground/70">{star.pushed_at.slice(0, 10)}</div>
@@ -77,18 +82,18 @@ export const StarRow = memo(function StarRow({
         className="flex flex-wrap items-center gap-1 overflow-hidden"
       >
         {myTags.length === 0 ? (
-          <span className="text-xs italic text-muted-foreground/50">—</span>
+          <span className="text-xs italic text-muted-foreground/50">{m.common.none}</span>
         ) : (
           <>
             {visible.map((t) => (
-              <button key={t} onClick={() => onToggleTag(t)} title={selectedSet.has(t) ? `筛选中:移除 "${t}"` : `按 "${t}" 筛选`}>
+              <button key={t} onClick={() => onToggleTag(t)} title={selectedSet.has(t) ? m.starRow.clearTagFilter(t) : m.starRow.filterByTag(t)}>
                 <Badge variant={selectedSet.has(t) ? 'tagActive' : 'tag'} className="cursor-pointer hover:opacity-80">
                   {t}
                 </Badge>
               </button>
             ))}
             {overflow && (
-              <span className="text-[10px] text-muted-foreground" title={`还有 ${hiddenCount} 个,在详情中查看全部`}>
+              <span className="text-[10px] text-muted-foreground" title={m.starRow.moreHidden(hiddenCount)}>
                 +{hiddenCount}
               </span>
             )}
@@ -97,8 +102,8 @@ export const StarRow = memo(function StarRow({
       </div>
 
       {/* Note indicator */}
-      <div className="text-center" title={hasNotes ? '有笔记(详情中查看)' : '无笔记'}>
-        {hasNotes && <span className="text-xs text-muted-foreground">📝</span>}
+      <div className="flex justify-center" title={hasNotes ? m.starRow.hasNotes : m.starRow.noNotes}>
+        {hasNotes && <StickyNote className="size-3.5 text-muted-foreground" />}
       </div>
     </div>
   );

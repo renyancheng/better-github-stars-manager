@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, X, Archive, Star as StarIcon, Check } from 'lucide-react';
 import type { Star, Tag } from '@/types';
 import { suggestTags } from '@/ui/suggest';
 import { bgCall } from '@/utils/messaging';
@@ -7,7 +9,9 @@ import { Badge } from '@/ui/shadcn/badge';
 import { Button } from '@/ui/shadcn/button';
 import { Textarea } from '@/ui/shadcn/textarea';
 import { Separator } from '@/ui/shadcn/separator';
+import { Spinner } from '@/ui/shadcn/spinner';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n';
 
 /**
  * Right-side detail drawer for a single repo. Deep editing (tags + notes +
@@ -19,6 +23,7 @@ export function RepoDetailPanel({
   tag,
   selectedTags,
   onToggleTag,
+  onDataChanged,
   onClose,
   onPrev,
   onNext,
@@ -29,6 +34,7 @@ export function RepoDetailPanel({
   tag: Tag | undefined;
   selectedTags: string[];
   onToggleTag: (tag: string) => void;
+  onDataChanged?: () => void;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -38,9 +44,12 @@ export function RepoDetailPanel({
   const myTags = tag?.tags ?? [];
   const notes = tag?.notes ?? '';
   const suggestions = suggestTags(star, myTags);
+  const { m } = useI18n();
 
   const [draft, setDraft] = useState(notes);
   const [saved, setSaved] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [accepting, setAccepting] = useState(false);
   useEffect(() => {
     setDraft(notes);
     setSaved(false);
@@ -48,14 +57,26 @@ export function RepoDetailPanel({
 
   const saveNotes = async () => {
     if (draft !== notes) {
-      await bgCall('setNotes', { full_name: star.full_name, notes: draft });
-      setSaved(true);
+      setSavingNotes(true);
+      try {
+        await bgCall('setNotes', { full_name: star.full_name, notes: draft });
+        onDataChanged?.();
+        setSaved(true);
+      } finally {
+        setSavingNotes(false);
+      }
     }
   };
 
   const acceptSuggestions = async () => {
     if (suggestions.length === 0) return;
-    await bgCall('acceptSuggestions', { full_name: star.full_name, toAdd: suggestions });
+    setAccepting(true);
+    try {
+      await bgCall('acceptSuggestions', { full_name: star.full_name, toAdd: suggestions });
+      onDataChanged?.();
+    } finally {
+      setAccepting(false);
+    }
   };
 
   // Keyboard nav (Esc close, [ / ] prev/next) — ignored while typing in fields.
@@ -79,10 +100,10 @@ export function RepoDetailPanel({
     <div className="flex h-full w-[340px] flex-col overflow-auto border-l border-border bg-card">
       {/* Header */}
       <div className="flex items-center gap-1.5 border-b border-border px-3 py-2">
-        <Button variant="ghost" size="icon" onClick={onPrev} disabled={!hasPrev} title="上一个 ( [ )" className={cn(!hasPrev && 'opacity-30')}>‹</Button>
-        <Button variant="ghost" size="icon" onClick={onNext} disabled={!hasNext} title="下一个 ( ] )" className={cn(!hasNext && 'opacity-30')}>›</Button>
+        <Button variant="ghost" size="icon" onClick={onPrev} disabled={!hasPrev} title={m.repoDetail.previousTitle} className={cn(!hasPrev && 'opacity-30')}><ChevronLeft className="size-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={onNext} disabled={!hasNext} title={m.repoDetail.nextTitle} className={cn(!hasNext && 'opacity-30')}><ChevronRight className="size-4" /></Button>
         <span className="flex-1" />
-        <Button variant="ghost" size="icon" onClick={onClose} title="关闭 (Esc)">✕</Button>
+        <Button variant="ghost" size="icon" onClick={onClose} title={m.repoDetail.closeTitle}><X className="size-4" /></Button>
       </div>
 
       <div className="flex flex-col gap-4 p-3">
@@ -92,23 +113,35 @@ export function RepoDetailPanel({
             {star.full_name}
           </a>
           <div className="mt-0.5 flex gap-2">
-            {star.archived && <span className="text-xs text-warning" title="archived">📦 archived</span>}
-            {star.tombstone && <span className="text-xs text-destructive" title="unstarred">⊘ unstarred</span>}
+            {star.archived && (
+              <span className="inline-flex items-center gap-1 text-xs text-warning" title={m.starRow.archived}>
+                <Archive className="size-3" />
+                {m.starRow.archived}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Meta grid */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
-          <Meta label="Language" value={star.language ?? '—'} />
-          <Meta label="Stars" value={`★ ${fmt(star.stargazers_count)}`} />
-          <Meta label="Updated" value={star.pushed_at.slice(0, 10)} />
-          <Meta label="Starred" value={star.starred_at.slice(0, 10)} />
+          <Meta label={m.repoDetail.language} value={star.language ?? m.common.none} />
+          <Meta
+            label={m.repoDetail.stars}
+            value={
+              <span className="inline-flex items-center gap-0.5 tabular-nums">
+                <StarIcon className="size-3 fill-current" />
+                {fmt(star.stargazers_count)}
+              </span>
+            }
+          />
+          <Meta label={m.repoDetail.updated} value={star.pushed_at.slice(0, 10)} />
+          <Meta label={m.repoDetail.starred} value={star.starred_at.slice(0, 10)} />
         </div>
 
         {star.description && (
           <>
             <Separator />
-            <Section title="Description">
+            <Section title={m.repoDetail.description}>
               <p className="m-0 text-xs leading-relaxed text-foreground">{star.description}</p>
             </Section>
           </>
@@ -117,10 +150,10 @@ export function RepoDetailPanel({
         {star.topics.length > 0 && (
           <>
             <Separator />
-            <Section title={`Topics (${star.topics.length})`}>
+            <Section title={m.repoDetail.topics(star.topics.length)}>
               <div className="flex flex-wrap gap-1">
                 {star.topics.map((t) => (
-                  <button key={t} onClick={() => onToggleTag(t)} title="点击按此 topic 筛选">
+                  <button key={t} onClick={() => onToggleTag(t)} title={m.repoDetail.filterTopic}>
                     <Badge variant={selectedSet.has(t) ? 'tagActive' : 'tag'} className="cursor-pointer hover:opacity-80">{t}</Badge>
                   </button>
                 ))}
@@ -132,33 +165,53 @@ export function RepoDetailPanel({
         {suggestions.length > 0 && (
           <>
             <Separator />
-            <Section title="Suggested tags">
+            <Section title={m.repoDetail.suggestedTags}>
               <div className="flex flex-wrap items-center gap-1">
                 {suggestions.map((t) => (
                   <Badge key={t} variant="outline" className="opacity-70 [border-style:dashed]">{t}</Badge>
                 ))}
-                <Button variant="outline" size="sm" onClick={acceptSuggestions} title="把这些建议加为标签">+ 全部接受</Button>
+                <Button variant="outline" size="sm" onClick={() => void acceptSuggestions()} title={m.repoDetail.acceptAllTitle} disabled={accepting}>
+                  {accepting ? (
+                    <>
+                      <Spinner data-icon="inline-start" />
+                      {m.repoDetail.acceptAll}
+                    </>
+                  ) : (
+                    m.repoDetail.acceptAll
+                  )}
+                </Button>
               </div>
             </Section>
           </>
         )}
 
         <Separator />
-        <Section title={`Tags (${myTags.length})`}>
-          <TagEditor full_name={star.full_name} tags={myTags} selectedTags={selectedTags} onToggleTag={onToggleTag} />
+        <Section title={m.repoDetail.tags(myTags.length)}>
+          <TagEditor full_name={star.full_name} tags={myTags} selectedTags={selectedTags} onToggleTag={onToggleTag} onDataChanged={onDataChanged} />
         </Section>
 
         <Separator />
-        <Section title="Notes">
+        <Section title={m.repoDetail.notes}>
           <Textarea
             value={draft}
             onChange={(e) => { setDraft(e.target.value); setSaved(false); }}
             onBlur={saveNotes}
-            placeholder="为什么 star 这个仓库?"
+            placeholder={m.repoDetail.notesPlaceholder}
             rows={4}
+            disabled={savingNotes}
           />
           <div className="mt-0.5 h-3 text-[10px] text-muted-foreground">
-            {saved ? <span className="text-success">✓ 已保存</span> : draft !== notes ? '未保存(失焦保存)' : ''}
+            {savingNotes ? (
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                <Spinner className="size-3" />
+                {m.common.loading}
+              </span>
+            ) : saved ? (
+              <span className="inline-flex items-center gap-1 text-success">
+                <Check className="size-3" />
+                {m.repoDetail.notesSaved}
+              </span>
+            ) : draft !== notes ? m.repoDetail.notesUnsaved : ''}
           </div>
         </Section>
       </div>
@@ -166,7 +219,7 @@ export function RepoDetailPanel({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
       <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">{title}</div>
@@ -175,7 +228,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function Meta({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <div className="text-[10px] text-muted-foreground/70">{label}</div>

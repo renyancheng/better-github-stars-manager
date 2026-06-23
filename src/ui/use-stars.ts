@@ -15,6 +15,7 @@ export function useStars() {
   const f = useFilterStore();
   const [result, setResult] = useState<QueryResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const filter = {
     query: f.query,
@@ -25,6 +26,11 @@ export function useStars() {
     onlyUntagged: f.onlyUntagged,
     sortKey: f.sortKey,
     sortDir: f.sortDir,
+  };
+
+  const refresh = () => {
+    setLoading(true);
+    setRefreshKey((key) => key + 1);
   };
 
   useEffect(() => {
@@ -42,24 +48,19 @@ export function useStars() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(filter)]);
+  }, [JSON.stringify(filter), refreshKey]);
 
   // Live refresh when background signals data changed (sync/write).
   useEffect(() => {
     const listener = (msg: { type?: string }) => {
       if (msg.type === 'dataChanged') {
-        chrome.runtime
-          .sendMessage({ type: 'query', params: { filter, offset: 0, limit: Number.MAX_SAFE_INTEGER } })
-          .then((res: { ok: boolean; data?: QueryResult }) => {
-            if (res?.ok && res.data) setResult(res.data);
-          })
-          .catch(() => {});
+        setLoading(true);
+        setRefreshKey((key) => key + 1);
       }
     };
     chrome.runtime.onMessage.addListener(listener);
     return () => chrome.runtime.onMessage.removeListener(listener);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(filter)]);
+  }, []);
 
   const rows: Star[] = result?.rows ?? [];
   const tagsByFullName = new Map<string, Tag>();
@@ -85,5 +86,6 @@ export function useStars() {
     languages: result?.languages ?? [],
     tagTree: { grouped: tagTreeGrouped, total: result?.tagTotal ?? 0 },
     tagsByFullName,
+    refresh,
   };
 }

@@ -1,32 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { AlertTriangle } from 'lucide-react';
 import { useStars } from '@/ui/use-stars';
 import { useFilterStore } from '@/ui/filter-store';
 import { StarRow } from '@/ui/components/StarRow';
 import { Toolbar } from '@/ui/components/Toolbar';
 import { FilterSidebar } from '@/ui/components/FilterSidebar';
 import { ActiveFilterChips } from '@/ui/components/ActiveFilterChips';
+import { FloatingLocaleToggle } from '@/ui/components/FloatingLocaleToggle';
 import { RepoDetailPanel } from '@/ui/components/RepoDetailPanel';
+import { Button } from '@/ui/shadcn/button';
 import { PortalProvider } from '@/ui/shadcn/portal-context';
 import { useTheme } from '@/ui/hooks/use-theme';
-import { bgCall, onProgress, type SyncStatus } from '@/utils/messaging';
+import { bgCall, mergeProgressStatus, mergeStatusSnapshot, onProgress, type SyncStatus } from '@/utils/messaging';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n';
 
 const ROW_HEIGHT = 64; // fixed; matches StarRow h-16 + virtualizer estimate
 // grid columns shared by the sticky header and each row — keep in sync with StarRow.
 const GRID_COLS = 'grid-cols-[minmax(180px,1.4fr)_2fr_80px_64px_84px_1.6fr_20px]';
 
 export function ManagerPanel() {
-  const { rows, total, grandTotal, loading, languages, tagTree, tagsByFullName } = useStars();
+  const { rows, total, grandTotal, loading, languages, tagTree, tagsByFullName, refresh: refreshStars } = useStars();
   const f = useFilterStore();
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const { theme, themeClass, toggle: toggleTheme } = useTheme();
+  const { m } = useI18n();
 
   // Read initial tag filter from URL hash (D4 chip click → #gsm-tag=xxx).
   useEffect(() => {
@@ -42,18 +48,20 @@ export function ManagerPanel() {
   useEffect(() => {
     let off = () => {};
     (async () => {
+      off = onProgress((progress) => setStatus((current) => mergeProgressStatus(current, progress)));
       const st = await bgCall<SyncStatus>('getStatus').catch(() => null);
-      setStatus(st);
+      setStatus((current) => mergeStatusSnapshot(current, st));
       if (st?.hasToken) {
         const q = await bgCall<{ grandTotal: number }>('query', {
           params: { filter: emptyFilter(), offset: 0, limit: 1 },
         }).catch(() => null);
         const syncType = q && q.grandTotal > 0 ? 'syncIncremental' : 'syncFull';
-        bgCall(syncType).catch(
-          (e) => setInfo(`✗ ${syncType}: ${e instanceof Error ? e.message : String(e)}`),
-        );
+        const syncLabel = syncType === 'syncIncremental' ? m.popup.syncIncremental : m.popup.syncFull;
+        setPendingAction(syncType);
+        bgCall(syncType)
+          .catch((e) => setInfo(m.manager.syncFailed(syncLabel, e instanceof Error ? e.message : String(e))))
+          .finally(() => setPendingAction((cur) => (cur === syncType ? null : cur)));
       }
-      off = onProgress(() => bgCall<SyncStatus>('getStatus').then(setStatus));
     })();
     return () => off();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -82,27 +90,31 @@ export function ManagerPanel() {
 
   const doSync = async (type: string, label: string) => {
     setBusy(true);
+    setPendingAction(type);
     setInfo(null);
     try {
-      const r = await bgCall<Record<string, number>>(type);
-      setInfo(`${label}: ${JSON.stringify(r)}`);
+      await bgCall(type);
+      refreshStars();
     } catch (e) {
-      setInfo(`✗ ${label}: ${e instanceof Error ? e.message : String(e)}`);
+      setInfo(m.manager.syncFailed(label, e instanceof Error ? e.message : String(e)));
     } finally {
       setBusy(false);
+      setPendingAction((cur) => (cur === type ? null : cur));
     }
   };
 
   const refreshTags = async () => {
     setBusy(true);
+    setPendingAction('refreshTags');
     setInfo(null);
     try {
-      const r = await bgCall<{ tagged: number }>('refreshTags');
-      setInfo(`已刷新:${r.tagged} 个仓库按 language/topics 更新了标签`);
+      await bgCall('refreshTags');
+      refreshStars();
     } catch (e) {
-      setInfo(`✗ refresh tags: ${e instanceof Error ? e.message : String(e)}`);
+      setInfo(m.manager.refreshTagsFailed(e instanceof Error ? e.message : String(e)));
     } finally {
       setBusy(false);
+      setPendingAction((cur) => (cur === 'refreshTags' ? null : cur));
     }
   };
 
@@ -118,14 +130,15 @@ export function ManagerPanel() {
   };
 
   // Whether any filter is active — drives the animated filter-chips row.
+  // (showTombstone disabled for now — not included.)
   const hasActiveFilter =
-    f.languages.length > 0 || f.tags.length > 0 || f.onlyUntagged || f.showTombstone;
+    f.languages.length > 0 || f.tags.length > 0 || f.onlyUntagged;
 
   return (
     <PortalProvider containerRef={rootRef}>
       <div
         ref={rootRef}
-        className={cn('flex h-full flex-col bg-background text-foreground font-sans', themeClass)}
+        className={cn('relative flex h-full flex-col bg-background text-foreground font-sans', themeClass)}
       >
         <Toolbar
           f={f}
@@ -134,6 +147,7 @@ export function ManagerPanel() {
           total={total}
           grandTotal={grandTotal}
           busy={busy}
+          pendingAction={pendingAction}
           onSync={doSync}
           onRefreshTags={refreshTags}
           onToggleTheme={toggleTheme}
@@ -142,14 +156,15 @@ export function ManagerPanel() {
         />
 
         {status && !status.hasToken && (
-          <div className="flex items-center gap-3 bg-warning/10 px-3 py-2 text-xs text-warning">
-            <span>⚠️ 未配置 GitHub token — 无法加载数据。</span>
-            <button
+          <div className="flex items-center gap-2 bg-warning/10 px-3 py-2 text-xs text-warning">
+            <AlertTriangle className="size-4 shrink-0" />
+            <span>{m.manager.noTokenBanner}</span>
+            <Button
+              size="sm"
               onClick={() => chrome.runtime.openOptionsPage()}
-              className="rounded bg-primary px-2.5 py-0.5 text-primary-foreground"
             >
-              打开选项页添加 PAT
-            </button>
+              {m.manager.addPat}
+            </Button>
           </div>
         )}
 
@@ -173,17 +188,17 @@ export function ManagerPanel() {
                 GRID_COLS,
               )}
             >
-              <span>Repository</span>
-              <span>Description</span>
-              <span>Lang</span>
-              <span className="text-right">Stars</span>
-              <span>Updated</span>
-              <span>Tags</span>
+              <span>{m.toolbar.columnRepository}</span>
+              <span>{m.toolbar.columnDescription}</span>
+              <span>{m.toolbar.columnLanguage}</span>
+              <span className="text-right">{m.toolbar.columnStars}</span>
+              <span>{m.toolbar.columnUpdated}</span>
+              <span>{m.toolbar.columnTags}</span>
               <span />
             </div>
             {rows.length === 0 ? (
               <div className="p-10 text-center text-sm text-muted-foreground">
-                {loading ? '加载中…' : '无结果。调整筛选,或点击工具栏 ↻ Sync。'}
+                {loading ? m.common.loading : m.manager.emptyState}
               </div>
             ) : (
               <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
@@ -219,6 +234,7 @@ export function ManagerPanel() {
                 tag={selectedTag}
                 selectedTags={f.tags}
                 onToggleTag={f.toggleTag}
+                onDataChanged={refreshStars}
                 onClose={() => setSelected(null)}
                 onPrev={() => selectedIdx > 0 && setSelected(rows[selectedIdx - 1].full_name)}
                 onNext={() => selectedIdx >= 0 && selectedIdx < rows.length - 1 && setSelected(rows[selectedIdx + 1].full_name)}
@@ -228,6 +244,8 @@ export function ManagerPanel() {
             )}
           </div>
         </div>
+
+        <FloatingLocaleToggle drawerOpen={!!selectedStar} />
       </div>
     </PortalProvider>
   );

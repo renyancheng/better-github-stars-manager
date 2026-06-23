@@ -1,6 +1,8 @@
 import type { FilterState } from '@/ui/filter-store';
+import { X } from 'lucide-react';
 import { Badge } from '@/ui/shadcn/badge';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n';
 
 /**
  * Active filter chips row: shows WHY the current result set is filtered, with a
@@ -13,6 +15,7 @@ export function ActiveFilterChips({
   f: FilterState;
   count: number;
 }) {
+  const { m } = useI18n();
   const active: { label: string; clear: () => void; kind: 'lang' | 'tag' | 'special' }[] = [];
   for (const lang of f.languages) {
     active.push({ label: lang, clear: () => f.toggleLanguage(lang), kind: 'lang' });
@@ -20,8 +23,9 @@ export function ActiveFilterChips({
   for (const tag of f.tags) {
     active.push({ label: tag, clear: () => f.toggleTag(tag), kind: 'tag' });
   }
-  if (f.onlyUntagged) active.push({ label: '未标注', clear: () => f.setOnlyUntagged(false), kind: 'special' });
-  if (f.showTombstone) active.push({ label: '已 unstar', clear: () => f.setShowTombstone(false), kind: 'special' });
+  if (f.onlyUntagged) active.push({ label: m.activeFilters.onlyUntagged, clear: () => f.setOnlyUntagged(false), kind: 'special' });
+  // "Show unstarred" (tombstone) chip — disabled for now.
+  // if (f.showTombstone) active.push({ label: m.filterSidebar.showTombstoneLabel, clear: () => f.setShowTombstone(false), kind: 'special' });
 
   // No early return — the container in ManagerPanel animates height, so this
   // component always renders its inner content (which collapses to 0 height
@@ -29,9 +33,9 @@ export function ActiveFilterChips({
 
   return (
     <div className="flex flex-wrap items-center gap-1 bg-muted/30 px-3 py-1">
-      <span className="mr-1 text-[10px] text-muted-foreground">{count} 结果 · 筛选中</span>
+      <span className="mr-1 text-[10px] text-muted-foreground">{m.activeFilters.summary(count)}</span>
       {active.map((a, i) => (
-        <button key={`${a.label}-${i}`} onClick={a.clear} title="点击移除该筛选">
+        <button key={`${a.label}-${i}`} onClick={a.clear} title={m.activeFilters.clearOne}>
           <Badge
             variant={a.kind === 'tag' ? 'default' : 'secondary'}
             className={cn(
@@ -40,16 +44,16 @@ export function ActiveFilterChips({
             )}
           >
             {a.label}
-            <span className="opacity-60">✕</span>
+            <X className="size-3 opacity-60" />
           </Badge>
         </button>
       ))}
       <button
         onClick={() => f.resetFilters()}
         className="ml-1 text-[11px] text-muted-foreground underline hover:text-foreground"
-        title="清除全部筛选"
+        title={m.activeFilters.clearAll}
       >
-        Clear all
+        {m.activeFilters.clearAll}
       </button>
     </div>
   );
