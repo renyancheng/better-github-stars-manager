@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { authStore } from '@/auth/auth-store';
+import { I18nProvider } from '@/i18n';
 import '@/ui/styles.css';
 import { Popup } from './Popup';
 
@@ -11,4 +12,8 @@ authStore.getTheme().then((t) => {
   document.documentElement.classList.toggle('dark', t === 'dark');
 });
 
-createRoot(root).render(<Popup />);
+createRoot(root).render(
+  <I18nProvider>
+    <Popup />
+  </I18nProvider>,
+);

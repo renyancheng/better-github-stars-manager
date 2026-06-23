@@ -11,17 +11,20 @@ import { encrypt, decrypt } from './crypto';
  * encrypted in chrome.storage.local.
  */
 
-const STORAGE_KEY = 'gsm_config';
+export const CONFIG_STORAGE_KEY = 'gsm_config';
 
 const DEFAULT_CONFIG: Config = {
   tokenEncrypted: null,
   tokenCryptoMeta: null,
   theme: 'dark',
+  locale: 'en',
   defaultView: 'table',
   lastSyncStarredAt: null,
   gistId: null,
   gistSyncCursor: null,
   username: null,
+  avatarUrl: null,
+  displayName: null,
 };
 
 let cache: Config | null = null;
@@ -29,15 +32,40 @@ let plaintextToken: string | null = null; // in-memory only
 
 async function read(): Promise<Config> {
   if (cache) return cache;
-  const raw = await chrome.storage.local.get(STORAGE_KEY);
-  const stored = (raw[STORAGE_KEY] ?? {}) as Partial<Config>;
+  const raw = await chrome.storage.local.get(CONFIG_STORAGE_KEY);
+  const stored = (raw[CONFIG_STORAGE_KEY] ?? {}) as Partial<Config>;
   cache = { ...DEFAULT_CONFIG, ...stored };
   return cache;
 }
 
 async function write(next: Config): Promise<void> {
   cache = next;
-  await chrome.storage.local.set({ [STORAGE_KEY]: next });
+  await chrome.storage.local.set({ [CONFIG_STORAGE_KEY]: next });
+}
+
+async function readDecryptedToken(): Promise<string | null> {
+  if (plaintextToken) return plaintextToken;
+  const c = await read();
+  if (!c.tokenEncrypted || !c.tokenCryptoMeta) return null;
+  plaintextToken = await decrypt(c.tokenEncrypted, c.tokenCryptoMeta);
+  return plaintextToken;
+}
+
+if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+    const change = changes[CONFIG_STORAGE_KEY];
+    if (!change) return;
+
+    const prev = cache;
+    const stored = (change.newValue ?? {}) as Partial<Config>;
+    cache = { ...DEFAULT_CONFIG, ...stored };
+
+    const tokenChanged =
+      prev?.tokenEncrypted !== cache.tokenEncrypted ||
+      JSON.stringify(prev?.tokenCryptoMeta ?? null) !== JSON.stringify(cache.tokenCryptoMeta ?? null);
+    if (tokenChanged) plaintextToken = null;
+  });
 }
 
 export const authStore = {
@@ -46,29 +74,38 @@ export const authStore = {
   },
 
   async hasToken(): Promise<boolean> {
-    const c = await read();
-    return !!c.tokenEncrypted;
+    return !!(await readDecryptedToken());
   },
 
   /** The decrypted token, or null. Held only in memory. */
   async getToken(): Promise<string | null> {
-    if (plaintextToken) return plaintextToken;
-    const c = await read();
-    if (!c.tokenEncrypted || !c.tokenCryptoMeta) return null;
-    plaintextToken = await decrypt(c.tokenEncrypted, c.tokenCryptoMeta);
-    return plaintextToken;
+    return readDecryptedToken();
   },
 
   async getUsername(): Promise<string | null> {
     return (await read()).username;
   },
 
+  /** Account identity for the top bar: username + avatar + display name. */
+  async getAccount(): Promise<{ username: string | null; avatarUrl: string | null; displayName: string | null }> {
+    const c = await read();
+    return { username: c.username, avatarUrl: c.avatarUrl, displayName: c.displayName };
+  },
+
   async getTheme(): Promise<'dark' | 'light'> {
     return (await read()).theme;
   },
 
+  async getLocale(): Promise<'en' | 'zh-CN'> {
+    return (await read()).locale;
+  },
+
   async setTheme(theme: 'dark' | 'light'): Promise<void> {
     await write({ ...(await read()), theme });
+  },
+
+  async setLocale(locale: 'en' | 'zh-CN'): Promise<void> {
+    await write({ ...(await read()), locale });
   },
 
   /**
@@ -96,7 +133,7 @@ export const authStore = {
       console.warn('[gsm] classic-token scopes may be insufficient:', scopes);
     }
 
-    const body = (await res.json()) as { login?: string };
+    const body = (await res.json()) as { login?: string; avatar_url?: string; name?: string | null };
     if (!body.login) throw new Error('Could not read username from /user');
 
     const { cipher, meta } = await encrypt(clean);
@@ -106,13 +143,22 @@ export const authStore = {
       tokenEncrypted: cipher,
       tokenCryptoMeta: meta,
       username: body.login,
+      avatarUrl: body.avatar_url ?? null,
+      displayName: body.name ?? null,
     });
     return { username: body.login };
   },
 
   async clearToken(): Promise<void> {
     plaintextToken = null;
-    await write({ ...(await read()), tokenEncrypted: null, tokenCryptoMeta: null, username: null });
+    await write({
+      ...(await read()),
+      tokenEncrypted: null,
+      tokenCryptoMeta: null,
+      username: null,
+      avatarUrl: null,
+      displayName: null,
+    });
   },
 
   async update(patch: Partial<Config>): Promise<void> {

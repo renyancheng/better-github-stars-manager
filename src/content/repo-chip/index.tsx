@@ -1,4 +1,6 @@
 import type { Tag } from '@/types';
+import { authStore } from '@/auth/auth-store';
+import { messageFor } from '@/i18n';
 import { bgCall } from '@/utils/messaging';
 
 /**
@@ -19,7 +21,18 @@ import { bgCall } from '@/utils/messaging';
  *   - ✎ button → inline edit (add/remove tags) writing to idbTagStore live
  */
 
-const injected = new Map<string, HTMLElement>(); // url → host element, for idempotency
+const injected = new Map<string, { el: HTMLElement; rerender: () => void }>(); // url → host element, for idempotency
+
+/**
+ * Inline-SVG line icons for the chip (vanilla DOM, closed shadow root — no React,
+ * so lucide-react components can't be used). 24×24 viewBox, 2px stroke, currentColor
+ * — matches the lucide icon set used in the React UI for visual consistency.
+ */
+function iconSvg(name: 'check' | 'pencil'): string {
+  const common = 'width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  if (name === 'check') return `<svg ${common}><path d="M20 6 9 17l-5-5"/></svg>`;
+  return `<svg ${common}><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
+}
 
 function parseRepoFromUrl(): { owner: string; repo: string } | null {
   const m = location.pathname.match(/^\/([^/]+)\/([^/]+?)(?:\/|$)/);
@@ -54,7 +67,7 @@ function findAnchor(): { host: HTMLElement; full_name: string } | null {
   return null;
 }
 
-function buildChip(full_name: string, tag: Tag | undefined): { el: HTMLElement; rerender: () => void } {
+function buildChip(full_name: string, tag: Tag | undefined, m = messageFor('en')): { el: HTMLElement; rerender: () => void } {
   const host = document.createElement('span');
   host.style.cssText = 'display:inline-flex;align-items:center;gap:4px;margin-left:8px;vertical-align:middle;';
   const root = host.attachShadow({ mode: 'open' });
@@ -67,11 +80,13 @@ function buildChip(full_name: string, tag: Tag | undefined): { el: HTMLElement; 
     .tag { display:inline-block; padding:1px 7px; border-radius:10px; background:rgba(24,23,23,0.08); color:#181717; cursor:pointer; border:1px solid rgba(24,23,23,0.25); }
     .tag:hover { background:rgba(24,23,23,0.15); }
     .none { color:#57606a; font-style:italic; font-size:11px; }
-    .edit { cursor:pointer; color:#57606a; border:1px solid #d0d7de; border-radius:4px; padding:0 4px; font-size:11px; }
+    .edit { cursor:pointer; color:#57606a; border:1px solid #d0d7de; border-radius:4px; padding:2px; display:inline-flex; align-items:center; line-height:0; }
+    .edit svg { display:block; }
     .edit:hover { color:#181717; border-color:#8c959f; }
     .editor { display:flex; gap:4px; align-items:center; }
     .editor input { font:12px monospace; padding:2px 6px; background:#ffffff; color:#181717; border:1px solid #d0d7de; border-radius:4px; width:180px; }
-    .editor button { font:11px system-ui; padding:2px 6px; background:#181717; color:#fff; border:0; border-radius:4px; cursor:pointer; }
+    .editor button { font:11px system-ui; padding:3px; background:#181717; color:#fff; border:0; border-radius:4px; cursor:pointer; display:inline-flex; align-items:center; line-height:0; }
+    .editor button svg { display:block; }
     @media (prefers-color-scheme: dark) {
       .tag { background:rgba(255,255,255,0.10); color:#e6edf3; border-color:rgba(255,255,255,0.25); }
       .tag:hover { background:rgba(255,255,255,0.18); }
@@ -98,10 +113,11 @@ function buildChip(full_name: string, tag: Tag | undefined): { el: HTMLElement; 
       editor.className = 'editor';
       const input = document.createElement('input');
       input.value = draft;
-      input.placeholder = 'tag1, tag2';
+      input.placeholder = m.tagEditor.bulkPlaceholder;
       input.oninput = () => (draft = input.value);
       const save = document.createElement('button');
-      save.textContent = '✓';
+      save.innerHTML = iconSvg('check');
+      save.setAttribute('aria-label', 'Save');
       save.onclick = async () => {
         const tags = draft.split(',').map((t) => t.trim()).filter(Boolean);
         await bgCall('setTags', { full_name, tags });
@@ -118,14 +134,14 @@ function buildChip(full_name: string, tag: Tag | undefined): { el: HTMLElement; 
       if (tags.length === 0) {
         const none = document.createElement('span');
         none.className = 'none';
-        none.textContent = 'untagged';
+        none.textContent = m.repoChip.untagged;
         wrap.appendChild(none);
       } else {
         for (const t of tags) {
           const c = document.createElement('span');
           c.className = 'tag';
           c.textContent = t;
-          c.title = `Filter stars by "${t}"`;
+          c.title = m.repoChip.filterByTag(t);
           c.onclick = async () => {
             // D4 click → open management page filtered by this tag.
             const u = await bgCall<{ username: string | null }>('getUsername');
@@ -139,8 +155,9 @@ function buildChip(full_name: string, tag: Tag | undefined): { el: HTMLElement; 
       }
       const edit = document.createElement('span');
       edit.className = 'edit';
-      edit.textContent = '✎';
-      edit.title = 'Edit tags';
+      edit.innerHTML = iconSvg('pencil');
+      edit.setAttribute('aria-label', m.repoChip.editTags);
+      edit.title = m.repoChip.editTags;
       edit.onclick = () => {
         editing = true;
         draft = (tag?.tags ?? []).join(', ');
@@ -164,17 +181,18 @@ async function inject() {
   // Idempotent: if we already injected for this URL, skip.
   if (injected.has(url)) return;
 
+  const m = messageFor(await authStore.getLocale());
   const got = await bgCall<{ tag: Tag | null }>('getTag', { full_name: anchor.full_name });
-  const { el } = buildChip(anchor.full_name, got.tag ?? undefined);
+  const { el, rerender } = buildChip(anchor.full_name, got.tag ?? undefined, m);
   anchor.host.insertAdjacentElement('afterend', el);
-  injected.set(url, el);
+  injected.set(url, { el, rerender });
 }
 
 function cleanup() {
   // Remove chips when navigating away from repo pages.
-  for (const [url, el] of injected) {
+  for (const [url, entry] of injected) {
     if (!location.pathname.match(/^\/[^/]+\/[^/]+/)) {
-      el.remove();
+      entry.el.remove();
       injected.delete(url);
     }
   }
@@ -186,4 +204,3 @@ inject();
 document.addEventListener('turbo:load', inject);
 document.addEventListener('turbo:render', inject);
 window.addEventListener('popstate', inject);
-

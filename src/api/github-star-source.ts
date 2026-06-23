@@ -2,6 +2,7 @@ import type { Star } from '@/types';
 import type { StarSource } from './star-source';
 import { db } from '@/storage/db';
 import { authStore } from '@/auth/auth-store';
+import { getMessages } from '@/i18n';
 
 /**
  * GitHubStarSource — MVP StarSource implementation backed by the authenticated
@@ -50,6 +51,10 @@ async function authHeaders(): Promise<HeadersInit> {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github.star+json', // includes starred_at in each item
   };
+}
+
+async function getLocaleMessages() {
+  return getMessages(await authStore.getLocale());
 }
 
 /** Parse the Link header to find the last page number (for progress totals). */
@@ -124,7 +129,7 @@ export function toStar(it: StarredRepoPayload): Star {
 /** Concurrently fetch a range of pages, bounded to avoid hammering the API.
  *  Results are returned in INPUT order (by page number), not completion order,
  *  so callers that depend on ordering (e.g. newest-first cursor) stay correct. */
-async function fetchPages(pages: number[], concurrency = 6): Promise<StarredRepoPayload[][]> {
+async function fetchPages(pages: number[], onPageDone?: () => void, concurrency = 6): Promise<StarredRepoPayload[][]> {
   const out: StarredRepoPayload[][] = new Array(pages.length);
   let idx = 0;
   const workers = Array.from({ length: Math.min(concurrency, pages.length) }, async () => {
@@ -134,6 +139,7 @@ async function fetchPages(pages: number[], concurrency = 6): Promise<StarredRepo
       idx++;
       const { items } = await fetchPage(my);
       out[slot] = items; // place by input index, not push-by-completion
+      onPageDone?.();
     }
   });
   await Promise.all(workers);
@@ -148,13 +154,18 @@ export const githubStarSource: StarSource = {
   },
 
   async syncFull(onProgress) {
+    const m = await getLocaleMessages();
     const first = await fetchPage(1);
     const total = lastPage(first.link) ?? 1;
-    onProgress?.({ phase: 'full', done: 1, total, message: `Fetching ${total} pages…` });
+    onProgress?.({ phase: 'full', done: 1, total, message: m.background.fetchingPages(total) });
 
     // We already have page 1; fetch the rest concurrently.
     const restPages = total > 1 ? Array.from({ length: total - 1 }, (_, i) => i + 2) : [];
-    const rest = await fetchPages(restPages);
+    let fetched = 1;
+    const rest = await fetchPages(restPages, () => {
+      fetched++;
+      onProgress?.({ phase: 'full', done: fetched, total, message: m.background.fetchingPages(total) });
+    });
     const all = [...first.items, ...rest.flat()];
 
     // Bulk upsert. Dexie bulkPut is the fastest path.
@@ -165,7 +176,7 @@ export const githubStarSource: StarSource = {
     const newest = all[0]?.starred_at ?? new Date().toISOString();
     await authStore.update({ lastSyncStarredAt: newest });
 
-    onProgress?.({ phase: 'full', done: total, total, message: `Synced ${stars.length} repos` });
+    onProgress?.({ phase: 'full', done: total, total, message: m.background.syncedRepos(stars.length) });
     return { added: stars.length, updated: stars.length };
   },
 
@@ -199,12 +210,17 @@ export const githubStarSource: StarSource = {
   },
 
   async syncRescan(onProgress) {
+    const m = await getLocaleMessages();
     const first = await fetchPage(1);
     const total = lastPage(first.link) ?? 1;
-    onProgress?.({ phase: 'rescan', done: 1, total, message: `Rescanning ${total} pages…` });
+    onProgress?.({ phase: 'rescan', done: 1, total, message: m.background.rescanningPages(total) });
 
     const restPages = total > 1 ? Array.from({ length: total - 1 }, (_, i) => i + 2) : [];
-    const rest = await fetchPages(restPages);
+    let fetched = 1;
+    const rest = await fetchPages(restPages, () => {
+      fetched++;
+      onProgress?.({ phase: 'rescan', done: fetched, total, message: m.background.rescanningPages(total) });
+    });
     const all = [...first.items, ...rest.flat()];
     const apiNames = new Set(all.map((it) => it.repo.full_name));
 
@@ -225,7 +241,7 @@ export const githubStarSource: StarSource = {
       }
     });
 
-    onProgress?.({ phase: 'rescan', done: total, total, message: `Rescan: ${tombstoned} unstarred, ${revived} revived` });
+    onProgress?.({ phase: 'rescan', done: total, total, message: `Rescan: ${tombstoned} removed from live set, ${revived} restored` });
     return { tombstoned, revived };
   },
 };

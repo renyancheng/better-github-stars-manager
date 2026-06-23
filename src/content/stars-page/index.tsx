@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { ManagerPanel } from '@/ui/ManagerPanel';
+import { I18nProvider } from '@/i18n';
 import cssText from '@/ui/styles.css?inline';
 
 /**
@@ -85,7 +86,11 @@ function injectPanel(): void {
   const main = document.querySelector('main') ?? document.querySelector('[data-pjax-container]') ?? document.body;
   main.parentElement?.insertBefore(host, main);
 
-  createRoot(root).render(<ManagerPanel />);
+  createRoot(root).render(
+    <I18nProvider>
+      <ManagerPanel />
+    </I18nProvider>,
+  );
 }
 
 // GitHub uses Turbo/PJAX; re-inject on navigation. If we navigated AWAY from

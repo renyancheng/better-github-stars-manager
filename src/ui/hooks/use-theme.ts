@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { authStore } from '@/auth/auth-store';
+import { authStore, CONFIG_STORAGE_KEY } from '@/auth/auth-store';
 
 /**
  * Theme hook: runtime dark/light switching, persisted in chrome.storage (via
@@ -16,7 +16,16 @@ export function useTheme() {
   const [theme, setThemeState] = useState<'dark' | 'light'>('dark');
 
   useEffect(() => {
-    authStore.getTheme().then((t) => setThemeState(t));
+    const syncTheme = () => {
+      authStore.getTheme().then((t) => setThemeState(t)).catch(() => {});
+    };
+    const listener = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
+      if (areaName === 'local' && changes[CONFIG_STORAGE_KEY]) syncTheme();
+    };
+
+    syncTheme();
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
   }, []);
 
   const toggle = useCallback(() => {

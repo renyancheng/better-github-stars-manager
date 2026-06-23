@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { authStore } from '@/auth/auth-store';
+import { I18nProvider } from '@/i18n';
 import '@/ui/styles.css';
 import { Options } from './Options';
 
@@ -10,4 +11,8 @@ authStore.getTheme().then((t) => {
   document.documentElement.classList.toggle('dark', t === 'dark');
 });
 
-createRoot(root).render(<Options />);
+createRoot(root).render(
+  <I18nProvider>
+    <Options />
+  </I18nProvider>,
+);

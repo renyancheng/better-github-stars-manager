@@ -1,7 +1,8 @@
 import { authStore } from '@/auth/auth-store';
 import { githubStarSource } from '@/api/github-star-source';
+import { getMessages } from '@/i18n';
 import { idbTagStore } from '@/storage/idb-tag-store';
-import { db } from '@/storage/db';
+import { db, liveStarCount } from '@/storage/db';
 import { queryStars, invalidateCache, type QueryParams, type QueryResult } from './query';
 import { suggestTags } from '@/ui/suggest';
 import type { SyncProgress } from '@/types';
@@ -23,7 +24,10 @@ type Req =
   | { type: 'gistPush' }
   | { type: 'gistPull' }
   | { type: 'getStatus' }
+  | { type: 'getDebugStatus' }
   | { type: 'getUsername' }
+  | { type: 'getAccount' }
+  | { type: 'fetchAccount' }
   | { type: 'query'; params: QueryParams }
   | { type: 'setTags'; full_name: string; tags: string[] }
   | { type: 'setNotes'; full_name: string; notes: string }
@@ -45,9 +49,17 @@ function setProgress(p: SyncProgress) {
   chrome.runtime.sendMessage({ type: 'progress', progress: p }).catch(() => {});
 }
 
+function setIdleMessage(message: string) {
+  setProgress({ phase: 'idle', done: 0, total: null, message });
+}
+
 function broadcastDataChanged() {
   invalidateCache();
   chrome.runtime.sendMessage({ type: 'dataChanged' }).catch(() => {});
+}
+
+async function getLocaleMessages() {
+  return getMessages(await authStore.getLocale());
 }
 
 async function run<T>(fn: () => Promise<T>): Promise<T> {
@@ -89,46 +101,113 @@ async function handle(req: Req): Promise<Res> {
   try {
     switch (req.type) {
       case 'syncIncremental': {
-        if (!(await authStore.hasToken())) return { ok: false, error: 'No token configured' };
+        const m = await getLocaleMessages();
+        if (!(await authStore.hasToken())) return { ok: false, error: m.background.noToken };
+        setProgress({ phase: 'incremental', done: 0, total: null, message: m.background.incrementalSyncing });
         const r = await run(() => githubStarSource.syncIncremental());
         const t = await autoTagAll();
         broadcastDataChanged();
-        setProgress({ phase: 'idle', done: 0, total: null, message: `+${r.added} new · ${t.tagged} auto-tagged` });
+        setIdleMessage(m.background.incrementalDone(r.added, t.tagged));
         return { ok: true, data: { ...r, autoTagged: t.tagged } };
       }
       case 'syncFull': {
-        if (!(await authStore.hasToken())) return { ok: false, error: 'No token configured' };
+        const m = await getLocaleMessages();
+        if (!(await authStore.hasToken())) return { ok: false, error: m.background.noToken };
         const r = await run(() => githubStarSource.syncFull((p) => setProgress(p)));
         const t = await autoTagAll();
         broadcastDataChanged();
-        setProgress({ phase: 'idle', done: 0, total: null, message: `Full sync done · ${t.tagged} auto-tagged` });
+        setIdleMessage(m.background.fullDone(t.tagged));
         return { ok: true, data: { ...r, autoTagged: t.tagged } };
       }
       case 'syncRescan': {
-        if (!(await authStore.hasToken())) return { ok: false, error: 'No token configured' };
+        const m = await getLocaleMessages();
+        if (!(await authStore.hasToken())) return { ok: false, error: m.background.noToken };
         const r = await run(() => githubStarSource.syncRescan((p) => setProgress(p)));
         const t = await autoTagAll();
         broadcastDataChanged();
-        setProgress({ phase: 'idle', done: 0, total: null, message: `Rescan done · ${t.tagged} auto-tagged` });
+        setIdleMessage(m.background.rescanDone(t.tagged));
         return { ok: true, data: { ...r, autoTagged: t.tagged } };
       }
       case 'refreshTags': {
+        const m = await getLocaleMessages();
         const t = await autoTagAll();
         broadcastDataChanged();
-        setProgress({ phase: 'idle', done: 0, total: null, message: `Refreshed · ${t.tagged} tagged` });
+        setIdleMessage(m.background.refreshTagsDone(t.tagged));
         return { ok: true, data: t };
       }
-      case 'gistPush':
-        return { ok: true, data: await idbTagStore.syncPush() };
+      case 'gistPush': {
+        const m = await getLocaleMessages();
+        setProgress({ phase: 'gist', done: 0, total: null, message: m.background.pushingTags });
+        const r = await idbTagStore.syncPush((done, total) => {
+          setProgress({ phase: 'gist', done, total, message: m.background.pushingTags });
+        });
+        setIdleMessage(r.pushed > 0 ? m.background.gistPushDone(r.pushed) : m.background.gistPushNoChanges);
+        return { ok: true, data: r };
+      }
       case 'gistPull': {
-        const r = await idbTagStore.syncPull();
+        const m = await getLocaleMessages();
+        setProgress({ phase: 'gist', done: 0, total: null, message: m.background.pullingTags });
+        const r = await idbTagStore.syncPull((done, total) => {
+          setProgress({ phase: 'gist', done, total, message: m.background.pullingTags });
+        });
         broadcastDataChanged();
+        setIdleMessage(m.background.gistPullDone(r.merged, r.total));
         return { ok: true, data: r };
       }
       case 'getStatus':
         return { ok: true, data: { progress: lastProgress, hasToken: await authStore.hasToken() } };
+      case 'getDebugStatus': {
+        const cfg = await authStore.getConfig();
+        const [hasToken, starCount, liveCount, sample] = await Promise.all([
+          authStore.hasToken(),
+          db.stars.count(),
+          liveStarCount(),
+          db.stars.orderBy('starred_at').reverse().first(),
+        ]);
+        return {
+          ok: true,
+          data: {
+            hasUsableToken: hasToken,
+            hasStoredCipher: !!cfg.tokenEncrypted,
+            hasCryptoMeta: !!cfg.tokenCryptoMeta,
+            username: cfg.username,
+            lastSyncStarredAt: cfg.lastSyncStarredAt,
+            gistId: cfg.gistId,
+            starCount,
+            liveStarCount: liveCount,
+            tombstoneCount: Math.max(0, starCount - liveCount),
+            newestSample: sample?.full_name ?? null,
+          },
+        };
+      }
       case 'getUsername':
         return { ok: true, data: { username: await authStore.getUsername() } };
+      case 'getAccount':
+        return { ok: true, data: await authStore.getAccount() };
+      case 'fetchAccount': {
+        // Backfill account identity (avatar/displayName) for users who verified
+        // before those fields were captured. One authenticated GET /user; the
+        // result is persisted so it never refetches. No-op + returns cached
+        // account if there's no usable token.
+        const token = await authStore.getToken();
+        if (!token) return { ok: true, data: await authStore.getAccount() };
+        try {
+          const res = await fetch('https://api.github.com/user', {
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+            cache: 'no-store',
+          });
+          if (!res.ok) return { ok: true, data: await authStore.getAccount() };
+          const body = (await res.json()) as { login?: string; avatar_url?: string; name?: string | null };
+          await authStore.update({
+            username: body.login ?? (await authStore.getUsername()),
+            avatarUrl: body.avatar_url ?? null,
+            displayName: body.name ?? null,
+          });
+          return { ok: true, data: await authStore.getAccount() };
+        } catch {
+          return { ok: true, data: await authStore.getAccount() };
+        }
+      }
       case 'query':
         return { ok: true, data: await queryStars(req.params) as QueryResult };
       case 'setTags':
@@ -154,7 +233,7 @@ async function handle(req: Req): Promise<Res> {
         // status + key headers, so the UI can show EXACTLY what GitHub returned
         // (instead of a stuck spinner). Never throws — returns ok:false with detail.
         const token = await authStore.getToken();
-        if (!token) return { ok: false, error: 'No token configured' };
+        if (!token) return { ok: false, error: (await getLocaleMessages()).background.noToken };
         try {
           const res = await fetch('https://api.github.com/user/starred?per_page=1&page=1', {
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.star+json' },
@@ -199,7 +278,7 @@ async function handle(req: Req): Promise<Res> {
     const msg = e instanceof Error ? e.message : String(e);
     // Reset progress to idle on failure so the UI doesn't stay stuck on
     // "Fetching N pages…" when a sync throws (e.g. bad token, network).
-    setProgress({ phase: 'idle', done: 0, total: null, message: `✗ ${msg}` });
+    setProgress({ phase: 'idle', done: 0, total: null, message: `${msg}` });
     return { ok: false, error: msg };
   }
 }
@@ -247,4 +326,3 @@ async function selfCheck() {
   }
 }
 selfCheck();
-

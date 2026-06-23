@@ -10,6 +10,8 @@
  * the incremental sync cursor (lastSyncStarredAt), gistId, gistSyncCursor.
  */
 
+export type Locale = 'en' | 'zh-CN';
+
 /** A starred repo record as stored locally (mirrors /user/starred fields we keep). */
 export interface Star {
   /** PK, e.g. "NVIDIA/SkillSpector" */
@@ -64,6 +66,7 @@ export interface Config {
   /** Initialization vector + salt metadata for the Web Crypto encryption, base64. */
   tokenCryptoMeta: CryptoMeta | null;
   theme: 'dark' | 'light';
+  locale: Locale;
   defaultView: 'list' | 'table';
   /** Incremental sync cursor: the newest starred_at we've already ingested. */
   lastSyncStarredAt: string | null;
@@ -73,6 +76,10 @@ export interface Config {
   gistSyncCursor: string | null;
   /** GitHub username derived from the token (for the /user/starred endpoint). */
   username: string | null;
+  /** GitHub avatar URL captured from /user (CDN-stable). Null until first verify/backfill. */
+  avatarUrl: string | null;
+  /** GitHub display name from /user (may be null — not every account sets one). */
+  displayName: string | null;
 }
 
 export interface CryptoMeta {
