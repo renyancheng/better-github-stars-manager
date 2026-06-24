@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /** Real Chrome (MV3) end-to-end verification via Puppeteer. */
-import puppeteer from 'puppeteer';
 import { existsSync, mkdtempSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { deleteSyncGists } from './gist-sync-admin.mjs';
+import { launchExtensionBrowser } from './puppeteer-runtime.mjs';
 
 const TOKEN = process.env.GH_TOKEN;
 if (!TOKEN) {
@@ -33,19 +33,7 @@ function assert(cond, msg) {
   }
 }
 
-const browser = await puppeteer.launch({
-  headless: false,
-  executablePath:
-    process.env.PUPPETEER_EXECUTABLE_PATH ||
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  userDataDir: USER_DATA_DIR,
-  args: [
-    `--disable-extensions-except=${DIST}`,
-    `--load-extension=${DIST}`,
-    '--no-first-run',
-    '--no-default-browser-check',
-  ],
-});
+const browser = await launchExtensionBrowser({ dist: DIST, userDataDir: USER_DATA_DIR });
 
 try {
   console.log(`   using Chrome profile: ${USER_DATA_DIR}`);

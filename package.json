@@ -2,10 +2,12 @@
   "name": "better-github-stars-manager",
   "version": "0.1.0",
   "description": "Manage your GitHub starred repos: tag, note, filter, search across thousands of stars. UI injected into the stars page.",
+  "packageManager": "pnpm@10.33.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "package:extension": "node scripts/package-extension.mjs",
     "prepare": "node scripts/setup-hooks.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node tests/commit-message.test.mjs && node --experimental-strip-types tests/ime-input.test.mjs && node --experimental-strip-types tests/tag-draft.test.mjs && node --experimental-strip-types tests/logic.test.ts && tsx tests/integration.test.ts && tsx tests/shape.test.ts && tsx tests/token-probe-and-status-regression.test.ts",

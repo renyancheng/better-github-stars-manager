@@ -1,0 +1,59 @@
+name: E2E Chrome Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Comma-separated verify-first-run scenarios
+        required: false
+        default: no-token,invalid-token,valid-token
+  schedule:
+    - cron: '0 4 * * 1'
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify-extension:
+    if: ${{ secrets.GH_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm build
+
+      - name: Run first-run Chrome verification
+        env:
+          CI: 'true'
+          PUPPETEER_HEADLESS: 'false'
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN_NO_STARS: ${{ secrets.GH_TOKEN_NO_STARS }}
+          GH_TOKEN_NO_GISTS: ${{ secrets.GH_TOKEN_NO_GISTS }}
+          GH_USER: ${{ vars.GH_USER }}
+          GSM_RESET_GIST: '1'
+          GSM_SCENARIO: ${{ github.event.inputs.scenario }}
+        run: |
+          scenario="${GSM_SCENARIO:-no-token,invalid-token,valid-token}"
+          xvfb-run -a pnpm test:verify-first-run -- --scenario="$scenario"

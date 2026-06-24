@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  package-and-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm build
+
+      - name: Run test suite
+        run: pnpm test
+
+      - name: Package extension
+        run: pnpm package:extension
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-${{ github.sha }}
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Create or update GitHub release
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" artifacts/* --clobber
+          else
+            gh release create "$TAG_NAME" artifacts/* --generate-notes --title "$TAG_NAME"
+          fi
+
+      - name: Publish to Chrome Web Store
+        if: ${{ startsWith(github.ref, 'refs/tags/') && vars.CWS_DEPLOY_ENABLED == 'true' }}
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_PUBLISH_TYPE: ${{ vars.CWS_PUBLISH_TYPE }}
+          CWS_SKIP_REVIEW: ${{ vars.CWS_SKIP_REVIEW }}
+        run: |
+          zip_path="$(find artifacts -maxdepth 1 -name '*.zip' | head -n 1)"
+          test -n "$zip_path"
+          node scripts/publish-chrome-web-store.mjs "$zip_path"

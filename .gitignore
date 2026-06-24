@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-zip
+artifacts
 *.local
 .DS_Store
 *.log

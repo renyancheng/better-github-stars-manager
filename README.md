@@ -88,6 +88,41 @@ Data model: three IDB stores — `stars` (GitHub metadata, rebuildable, not sync
 
 See [`docs/VERIFY.md`](docs/VERIFY.md) for the end-to-end verification checklist.
 
+## CI/CD
+
+GitHub Actions now covers three lanes:
+
+- **CI**: every PR and every push to `main` runs `pnpm typecheck`, `pnpm build`, and `pnpm test`, then uploads the built `dist/` artifact.
+- **Release**: every `v*` tag rebuilds the extension, reruns tests, packages `dist/` into a zip + SHA256 checksum, and attaches them to a GitHub Release.
+- **E2E Chrome verification**: a manual/weekly workflow runs the real extension in Puppeteer against GitHub using the existing first-run scenarios.
+
+Local release packaging:
+
+```bash
+pnpm build
+pnpm package:extension
+```
+
+That writes:
+
+- `artifacts/better-github-stars-manager-<version>.zip`
+- `artifacts/better-github-stars-manager-<version>.zip.sha256`
+
+### Secrets / variables
+
+To enable the E2E workflow:
+
+- repository secret `GH_TOKEN`
+- optional secrets `GH_TOKEN_NO_STARS`, `GH_TOKEN_NO_GISTS`
+- optional repository variable `GH_USER`
+
+To enable Chrome Web Store publish on release tags:
+
+- repository variable `CWS_DEPLOY_ENABLED=true`
+- repository variables `CWS_EXTENSION_ID`, `CWS_PUBLISHER_ID`
+- optional repository variables `CWS_PUBLISH_TYPE`, `CWS_SKIP_REVIEW`
+- repository secrets `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`, `CWS_REFRESH_TOKEN`
+
 ## Tech stack
 
 Vite + CRXJS · React 18 + TypeScript · @tanstack/react-virtual · Dexie (IndexedDB) ·

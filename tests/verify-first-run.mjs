@@ -1,14 +1,11 @@
 #!/usr/bin/env node
-import puppeteer from 'puppeteer';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { deleteSyncGists } from './gist-sync-admin.mjs';
+import { launchExtensionBrowser } from './puppeteer-runtime.mjs';
 
 const DIST = path.resolve(process.cwd(), 'dist');
-const CHROME_PATH =
-  process.env.PUPPETEER_EXECUTABLE_PATH ||
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const RESET_GIST = process.env.GSM_RESET_GIST === '1';
 const OPTIONS_PATH = '/src/options/index.html';
 const INVALID_TOKEN =
@@ -252,17 +249,7 @@ async function resolveGitHubUser() {
 }
 
 async function launchBrowser(userDataDir) {
-  return puppeteer.launch({
-    headless: false,
-    executablePath: CHROME_PATH,
-    userDataDir,
-    args: [
-      `--disable-extensions-except=${DIST}`,
-      `--load-extension=${DIST}`,
-      '--no-first-run',
-      '--no-default-browser-check',
-    ],
-  });
+  return launchExtensionBrowser({ dist: DIST, userDataDir });
 }
 
 async function detectExtensionId(browser) {
