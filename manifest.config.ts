@@ -12,6 +12,7 @@ export default defineManifest({
   name: 'Better GitHub Stars Manager',
   version: pkg.version,
   description: pkg.description,
+  homepage_url: 'https://github.com/izumi0uu/better-github-stars-manager',
   permissions: ['storage'],
   host_permissions: ['https://api.github.com/*', 'https://github.com/*'],
   background: {

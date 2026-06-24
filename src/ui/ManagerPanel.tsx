@@ -15,6 +15,7 @@ import { PortalProvider } from '@/ui/shadcn/portal-context';
 import { TooltipProvider } from '@/ui/shadcn/tooltip';
 import { useTheme } from '@/ui/hooks/use-theme';
 import { bgCall, mergeProgressStatus, mergeStatusPatch, mergeStatusSnapshot, onProgress, type SyncStatus } from '@/utils/messaging';
+import { hidePanel } from '@/content/stars-page/panel-toggle';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 
@@ -189,6 +190,7 @@ export function ManagerPanel() {
           onAutoAssignTags={autoAssignTags}
           onStatusPatch={(patch) => setStatus((cur) => mergeStatusPatch(cur, patch))}
           onToggleTheme={toggleTheme}
+          onTogglePanel={hidePanel}
           theme={theme}
           searchRef={searchRef}
         />

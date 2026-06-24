@@ -34,6 +34,7 @@ export interface MessageCatalog {
   };
   toolbar: {
     searchPlaceholder: string;
+    searchClearTitle: string;
     sortStarredAt: string;
     sortPushedAt: string;
     sortStars: string;
@@ -44,6 +45,10 @@ export interface MessageCatalog {
     themeTitle: string;
     /** Tooltip for the GitHub-home icon button (jump back to github.com). */
     githubHomeTitle: string;
+    /** Tooltip for the toolbar "hide panel" button (retract the overlay → native list). */
+    hidePanelTitle: string;
+    /** Tooltip for the "Star the project" link (opens the repo). */
+    starRepoTitle: string;
     autoAssignTitle: string;
     autoAssignButton: string;
     gistPushTitle: string;
@@ -160,6 +165,8 @@ export interface MessageCatalog {
   };
   options: {
     title: string;
+    /** Label for the prominent "Star the project" CTA button. */
+    starRepoButton: string;
     tokenHeading: string;
     tokenIntroPrefix: string;
     tokenLinkLabel: string;
@@ -328,7 +335,9 @@ const messages: Record<Locale, MessageCatalog> = {
       emptyState: "No results. Adjust filters, or click Sync in the toolbar.",
     },
     toolbar: {
-      searchPlaceholder: "Search name / description / topics / notes   (/ to focus)",
+      searchPlaceholder:
+        "Search name / description / topics / notes   (/ to focus)",
+      searchClearTitle: "Clear search",
       sortStarredAt: "Sort by starred date",
       sortPushedAt: "Sort by updated date",
       sortStars: "Sort by stars",
@@ -338,6 +347,8 @@ const messages: Record<Locale, MessageCatalog> = {
       syncButton: "Sync",
       themeTitle: "Toggle black/white theme",
       githubHomeTitle: "GitHub home",
+      hidePanelTitle: "Hide panel (use native stars list)",
+      starRepoTitle: "Give me a star~",
       autoAssignTitle: "Auto-assign tags from each repo's topics (no network)",
       autoAssignButton: "Auto assign tags",
       gistPushTitle: "Push tags to your Gist backup",
@@ -457,6 +468,7 @@ const messages: Record<Locale, MessageCatalog> = {
     },
     options: {
       title: "Better GitHub Stars Manager — Options",
+      starRepoButton: "Star on GitHub",
       tokenHeading: "1. GitHub Token",
       tokenIntroPrefix: "Create a fine-grained PAT at",
       tokenLinkLabel: "github.com/settings/tokens",
@@ -651,6 +663,7 @@ const messages: Record<Locale, MessageCatalog> = {
     },
     toolbar: {
       searchPlaceholder: "搜索 名称 / 描述 / topics / notes   (按 / 聚焦)",
+      searchClearTitle: "清空搜索",
       sortStarredAt: "按 star 时间",
       sortPushedAt: "按更新时间",
       sortStars: "按 star 数",
@@ -660,6 +673,8 @@ const messages: Record<Locale, MessageCatalog> = {
       syncButton: "Sync",
       themeTitle: "切换黑白主题",
       githubHomeTitle: "GitHub 首页",
+      hidePanelTitle: "隐藏面板（用 GitHub 原生列表）",
+      starRepoTitle: "点个Star~",
       autoAssignTitle: "根据每个仓库的 topics 自动分配标签（不请求网络）",
       autoAssignButton: "自动分配标签",
       gistPushTitle: "推送标签到你的 Gist 备份",
@@ -778,6 +793,7 @@ const messages: Record<Locale, MessageCatalog> = {
     },
     options: {
       title: "Better GitHub Stars Manager — 选项",
+      starRepoButton: "在 GitHub 点 Star",
       tokenHeading: "1. GitHub Token",
       tokenIntroPrefix: "在这里创建细粒度 PAT：",
       tokenLinkLabel: "github.com/settings/tokens",

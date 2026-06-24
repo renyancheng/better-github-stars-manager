@@ -6,6 +6,8 @@
 // (Node 24 strips types natively.)
 
 import assert from 'node:assert';
+import { hidePanel, isPanelEnabled, onPanelToggle, showPanel } from '../src/content/stars-page/panel-toggle.ts';
+import { mountState } from '../src/content/stars-page/mount-state.ts';
 
 // --- LWW merge logic (mirrors src/sync/gist-tag-store.ts pull()) ---
 // Two devices edited DIFFERENT repos; merge must keep both, taking newer mtime per repo.
@@ -146,6 +148,68 @@ test('does not re-suggest already-applied (case-insensitive)', () => {
 test('excluded tombstones are not re-suggested', () => {
   const s = suggestTags(sample[0], [], ['ai']);
   assert.deepEqual(s, ['agent']);
+});
+
+// --- Stars-page panel toggle state (mirrors src/content/stars-page/panel-toggle.ts) ---
+// Keeps the session-local enable/disable switch honest without exercising the
+// content-script DOM side effects, so this stays fast and isolated.
+function resetPanelToggle(): void {
+  onPanelToggle(() => {});
+  showPanel();
+}
+
+console.log('\nStars-page panel toggle state:');
+test('panel starts enabled', () => {
+  resetPanelToggle();
+  assert.equal(isPanelEnabled(), true);
+});
+test('hidePanel disables the panel', () => {
+  resetPanelToggle();
+  hidePanel();
+  assert.equal(isPanelEnabled(), false);
+});
+test('hidePanel and showPanel both dispatch the registered callback', () => {
+  resetPanelToggle();
+  let calls = 0;
+  onPanelToggle(() => {
+    calls++;
+  });
+  hidePanel();
+  showPanel();
+  assert.equal(isPanelEnabled(), true);
+  assert.equal(calls, 2);
+});
+test('latest registered callback wins', () => {
+  resetPanelToggle();
+  let oldCalls = 0;
+  let newCalls = 0;
+  onPanelToggle(() => {
+    oldCalls++;
+  });
+  onPanelToggle(() => {
+    newCalls++;
+  });
+  hidePanel();
+  assert.equal(oldCalls, 0);
+  assert.equal(newCalls, 1);
+});
+
+// --- Stars-page mount decision (mirrors src/content/stars-page/mount-state.ts) ---
+// Decides what the stars-page content script shows based on (on stars page?, panel enabled?):
+//   panel | fab | none. Kept as a pure module separate from the content-script
+//   entry (which drags in React + inline CSS) so this test stays a clean import.
+console.log('\nStars-page mount state:');
+test('on stars page + enabled → panel', () => {
+  assert.equal(mountState(true, true), 'panel');
+});
+test('on stars page + disabled → fab (floating re-mount button)', () => {
+  assert.equal(mountState(true, false), 'fab');
+});
+test('off stars page + enabled → none', () => {
+  assert.equal(mountState(false, true), 'none');
+});
+test('off stars page + disabled → none', () => {
+  assert.equal(mountState(false, false), 'none');
 });
 
 console.log(process.exitCode ? '\n❌ SOME TESTS FAILED' : '\n✅ All logic tests passed');

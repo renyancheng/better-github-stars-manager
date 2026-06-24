@@ -15,8 +15,12 @@ import { Spinner } from "@/ui/shadcn/spinner";
 import { Textarea } from "@/ui/shadcn/textarea";
 import { Separator } from "@/ui/shadcn/separator";
 import { cn } from "@/lib/utils";
+import { REPO_URL } from "@/lib/links";
 import { useImeBufferedInput } from "@/ui/hooks/use-ime-input";
 import { useI18n } from "@/i18n";
+import tutorialNewToken from "../../assets/tutorial/img_01.png";
+import tutorialRepoAccess from "../../assets/tutorial/img_02.png";
+import tutorialPermissions from "../../assets/tutorial/img_03.png";
 
 export function Options() {
   const [username, setUsername] = useState<string | null>(null);
@@ -169,6 +173,17 @@ export function Options() {
         </div>
       </div>
 
+      {/* Star the project — prominent CTA under the header. */}
+      <a
+        href={REPO_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-background hover:text-foreground hover:border hover:border-border"
+      >
+        <Star className="size-4" />
+        {m.options.starRepoButton}
+      </a>
+
       {/* 1. Token */}
       <section className="mt-6">
         <h2 className="text-base font-medium">{m.options.tokenHeading}</h2>
@@ -185,9 +200,7 @@ export function Options() {
           . {m.options.tokenIntroSuffix}
         </p>
 
-        {/* Detailed PAT walkthrough + screenshot placeholders.
-            Placeholders are dashed boxes the user will swap for <img src=…>
-            once they supply screenshots. Captions live in i18n. */}
+        {/* Detailed PAT walkthrough with tutorial screenshots. Captions live in i18n. */}
         <details className="mt-3 rounded-md border border-border bg-muted/20 p-3 text-[13px] text-muted-foreground">
           <summary className="cursor-pointer font-medium text-foreground">
             {m.options.tokenStepsTitle}
@@ -199,11 +212,19 @@ export function Options() {
             <li>{m.options.tokenStep4}</li>
             <li>{m.options.tokenStep5}</li>
           </ol>
-          {/* Screenshot placeholders — replace the boxes with <img> when ready. */}
           <div className="mt-3 grid gap-2">
-            <ScreenshotPlaceholder caption={m.options.shotNewToken} />
-            <ScreenshotPlaceholder caption={m.options.shotRepoAccess} />
-            <ScreenshotPlaceholder caption={m.options.shotPermissions} />
+            <ScreenshotCard
+              src={tutorialNewToken}
+              caption={m.options.shotNewToken}
+            />
+            <ScreenshotCard
+              src={tutorialRepoAccess}
+              caption={m.options.shotRepoAccess}
+            />
+            <ScreenshotCard
+              src={tutorialPermissions}
+              caption={m.options.shotPermissions}
+            />
           </div>
         </details>
 
@@ -310,11 +331,19 @@ export function Options() {
   );
 }
 
-/** Dashed placeholder box for a tutorial screenshot. Swap for an <img> later. */
-function ScreenshotPlaceholder({ caption }: { caption: string }) {
+function ScreenshotCard({ src, caption }: { src: string; caption: string }) {
   return (
-    <div className="flex aspect-[16/9] items-center justify-center rounded-md border border-dashed border-border bg-muted/30 p-3 text-center text-[11px] text-muted-foreground">
-      <span>{caption}</span>
-    </div>
+    <figure className="overflow-hidden rounded-md border border-border bg-muted/30">
+      <img
+        src={src}
+        alt={caption}
+        loading="lazy"
+        decoding="async"
+        className="block w-full"
+      />
+      <figcaption className="border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
+        {caption}
+      </figcaption>
+    </figure>
   );
 }

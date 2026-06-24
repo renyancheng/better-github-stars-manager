@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Sun, Moon, Search, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow,
-  Tags, Upload, Download, AlertTriangle, ExternalLink, Home,
+  Sun, Moon, Search, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow, X,
+  Tags, Upload, Download, AlertTriangle, ExternalLink, Home, EyeOff, Star,
 } from 'lucide-react';
 import { CONFIG_STORAGE_KEY } from '@/auth/auth-store';
+import { REPO_URL } from '@/lib/links';
 import type { FilterState } from '@/ui/filter-store';
 import type { SyncStatus } from '@/utils/messaging';
 import { bgCall } from '@/utils/messaging';
@@ -81,6 +82,7 @@ export function Toolbar({
   onAutoAssignTags,
   onStatusPatch,
   onToggleTheme,
+  onTogglePanel,
   theme,
   searchRef,
 }: {
@@ -97,6 +99,8 @@ export function Toolbar({
   onAutoAssignTags: () => void;
   onStatusPatch?: (patch: Partial<SyncStatus>) => void;
   onToggleTheme: () => void;
+  /** Retract the panel overlay → native stars list (+ floating re-mount button). */
+  onTogglePanel?: () => void;
   theme: 'dark' | 'light';
   searchRef: React.RefObject<HTMLInputElement>;
 }) {
@@ -152,14 +156,42 @@ export function Toolbar({
   return (
     <div className="border-b border-border bg-card">
       <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+        {/* Star the project — links to the repo (leftmost, top-left of the
+            panel). Opens in a new tab so the manager panel stays mounted. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-9 gap-1 px-2" asChild>
+              <a href={REPO_URL} target="_blank" rel="noreferrer" title={m.toolbar.starRepoTitle}>
+                <Star className="size-4" data-icon="inline-start" />
+                <span className="text-xs">Star</span>
+              </a>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{m.toolbar.starRepoTitle}</TooltipContent>
+        </Tooltip>
+
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchRef}
             {...searchInput.inputProps}
             placeholder={m.toolbar.searchPlaceholder}
-            className="h-9 pl-8"
+            className="h-9 pl-8 pr-8"
           />
+          {searchInput.value && (
+            <button
+              type="button"
+              title={m.toolbar.searchClearTitle}
+              aria-label={m.toolbar.searchClearTitle}
+              onClick={() => {
+                searchInput.commit('');
+                searchRef.current?.focus();
+              }}
+              className="absolute right-1.5 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
         </div>
 
         <Select value={f.sortKey} onValueChange={(value) => f.setSort(value as typeof f.sortKey)}>
@@ -268,6 +300,17 @@ export function Toolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent>{m.toolbar.themeTitle}</TooltipContent>
+        </Tooltip>
+
+        {/* Retract the panel overlay → native stars list (the floating
+            "show panel" button then appears so it can be re-mounted). */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onTogglePanel?.()}>
+              <EyeOff className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{m.toolbar.hidePanelTitle}</TooltipContent>
         </Tooltip>
 
         {/* GitHub home — same-tab jump back to github.com from the stars page. */}
