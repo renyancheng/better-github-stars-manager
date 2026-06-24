@@ -19,7 +19,6 @@ permissions:
 
 jobs:
   verify-extension:
-    if: ${{ secrets.GH_TOKEN != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
