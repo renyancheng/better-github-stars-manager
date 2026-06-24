@@ -48,7 +48,6 @@ jobs:
           CI: 'true'
           PUPPETEER_HEADLESS: 'false'
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          GH_TOKEN_NO_STARS: ${{ secrets.GH_TOKEN_NO_STARS }}
           GH_TOKEN_NO_GISTS: ${{ secrets.GH_TOKEN_NO_GISTS }}
           GH_USER: ${{ vars.GH_USER }}
           GSM_RESET_GIST: '1'

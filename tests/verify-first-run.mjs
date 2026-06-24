@@ -32,7 +32,6 @@ if (args.has('--help')) {
   GH_TOKEN=... GH_USER=... pnpm test:verify-first-run
 
 Optional env:
-  GH_TOKEN_NO_STARS=...   token that can read /user but lacks Stars:Read
   GH_TOKEN_NO_GISTS=...   token that can read /user but lacks Gists:ReadWrite
   GH_TOKEN_INVALID=...    override the fake invalid token used in the rejection test
   GSM_RESET_GIST=1        delete existing sync gists before the valid-token scenario
@@ -83,22 +82,6 @@ const scenarios = [
       const page = await openOptions(browser, extId);
       await saveToken(page, INVALID_TOKEN);
       await waitForText(page, 'GitHub rejected this token. Check that you copied the whole value.');
-      await expectNoAuthenticatedBanner(page);
-
-      const stars = await openStars(browser, starsUrl);
-      await waitForManagerRoot(stars);
-      await waitForText(stars, 'To manage your stars, add a GitHub token first:');
-    },
-  },
-  {
-    id: 'no-stars-token',
-    title: 'token without Stars permission is explained clearly',
-    needsStarsUser: true,
-    token: process.env.GH_TOKEN_NO_STARS || null,
-    run: async ({ browser, extId, starsUrl, token }) => {
-      const page = await openOptions(browser, extId);
-      await saveToken(page, token);
-      await waitForText(page, 'Public Repositories (read)');
       await expectNoAuthenticatedBanner(page);
 
       const stars = await openStars(browser, starsUrl);
@@ -167,7 +150,7 @@ for (const scenario of scenarios) {
       id: scenario.id,
       status: 'skipped',
       reason:
-        'Could not determine GH_USER. Set GH_USER, GH_TOKEN, GH_TOKEN_NO_STARS, or GH_TOKEN_NO_GISTS.',
+        'Could not determine GH_USER. Set GH_USER, GH_TOKEN, or GH_TOKEN_NO_GISTS.',
     });
     continue;
   }
@@ -228,7 +211,6 @@ async function resolveGitHubUser() {
 
   for (const token of [
     process.env.GH_TOKEN,
-    process.env.GH_TOKEN_NO_STARS,
     process.env.GH_TOKEN_NO_GISTS,
   ]) {
     if (!token) continue;
