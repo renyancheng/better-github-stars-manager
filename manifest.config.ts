@@ -13,6 +13,12 @@ export default defineManifest({
   version: pkg.version,
   description: pkg.description,
   homepage_url: 'https://github.com/izumi0uu/better-github-stars-manager',
+  icons: {
+    16: 'icons/icon-16.png',
+    32: 'icons/icon-32.png',
+    48: 'icons/icon-48.png',
+    128: 'icons/icon-128.png',
+  },
   permissions: ['storage'],
   host_permissions: ['https://api.github.com/*', 'https://github.com/*'],
   background: {
@@ -22,6 +28,12 @@ export default defineManifest({
   action: {
     default_popup: 'src/popup/index.html',
     default_title: 'Better GitHub Stars Manager',
+    default_icon: {
+      16: 'icons/icon-16.png',
+      32: 'icons/icon-32.png',
+      48: 'icons/icon-48.png',
+      128: 'icons/icon-128.png',
+    },
   },
   options_ui: {
     page: 'src/options/index.html',

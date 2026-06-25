@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { Sun, Moon, Star, Check, AlertTriangle, ExternalLink } from "lucide-react";
+import {
+  Sun,
+  Moon,
+  Star,
+  Check,
+  AlertTriangle,
+  ExternalLink,
+} from "lucide-react";
 import { authStore, CONFIG_STORAGE_KEY } from "@/auth/auth-store";
 import {
   bgCall,
@@ -18,9 +25,10 @@ import { cn } from "@/lib/utils";
 import { REPO_URL } from "@/lib/links";
 import { useImeBufferedInput } from "@/ui/hooks/use-ime-input";
 import { useI18n } from "@/i18n";
-import tutorialNewToken from "../../assets/tutorial/img_01.png";
-import tutorialRepoAccess from "../../assets/tutorial/img_02.png";
-import tutorialPermissions from "../../assets/tutorial/img_03.png";
+
+const tutorialNewToken = "/tutorial/img_01.png";
+const tutorialRepoAccess = "/tutorial/img_02.png";
+const tutorialPermissions = "/tutorial/img_03.png";
 
 export function Options() {
   const [username, setUsername] = useState<string | null>(null);
@@ -178,7 +186,7 @@ export function Options() {
         href={REPO_URL}
         target="_blank"
         rel="noreferrer"
-        className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-background hover:text-foreground hover:border hover:border-border"
+        className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-background hover:text-foreground"
       >
         <Star className="size-4" />
         {m.options.starRepoButton}

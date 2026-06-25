@@ -3,22 +3,33 @@ import type { ChangeEvent, CompositionEvent } from 'react';
 
 type ImeTextControl = HTMLInputElement | HTMLTextAreaElement;
 type CompositionAwareEvent = { nativeEvent?: unknown };
+type KeyboardAwareEvent = CompositionAwareEvent & { nativeEvent?: { keyCode?: number } };
 
 export function isImeComposing(event?: CompositionAwareEvent | null): boolean {
   if (!event || typeof event.nativeEvent !== 'object' || event.nativeEvent === null) {
     return false;
   }
+  const native = event.nativeEvent as { isComposing?: boolean; inputType?: string };
   return Boolean(
-    'isComposing' in event.nativeEvent &&
-      (event.nativeEvent as { isComposing?: boolean }).isComposing,
+    native.isComposing ||
+      (typeof native.inputType === 'string' &&
+        native.inputType.toLowerCase().includes('composition')),
   );
 }
 
 export function shouldIgnoreImeAction(
-  event?: CompositionAwareEvent | null,
+  event?: KeyboardAwareEvent | null,
   composingRef?: { current: boolean },
 ): boolean {
-  return Boolean(composingRef?.current) || isImeComposing(event);
+  return Boolean(composingRef?.current) || isImeComposing(event) || event?.nativeEvent?.keyCode === 229;
+}
+
+function shouldSyncImeDraft(
+  currentValue: string,
+  nextValue: string,
+  composing: boolean,
+): boolean {
+  return !composing && currentValue !== nextValue;
 }
 
 export function useImeBufferedInput(
@@ -29,7 +40,9 @@ export function useImeBufferedInput(
   const composingRef = useRef(false);
 
   useEffect(() => {
-    if (!composingRef.current) setDraft(value);
+    setDraft((current) =>
+      shouldSyncImeDraft(current, value, composingRef.current) ? value : current,
+    );
   }, [value]);
 
   const commit = (next: string) => {
@@ -40,7 +53,8 @@ export function useImeBufferedInput(
   const handleChange = (event: ChangeEvent<ImeTextControl>) => {
     const next = event.target.value;
     setDraft(next);
-    if (!composingRef.current && !isImeComposing(event)) onCommit?.(next);
+    if (composingRef.current || isImeComposing(event)) return;
+    onCommit?.(next);
   };
 
   const handleCompositionStart = () => {
@@ -62,6 +76,7 @@ export function useImeBufferedInput(
       value: draft,
       onChange: handleChange,
       onCompositionStart: handleCompositionStart,
+      onCompositionUpdate: handleCompositionStart,
       onCompositionEnd: handleCompositionEnd,
     },
   };

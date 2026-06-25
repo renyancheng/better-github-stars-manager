@@ -102,7 +102,7 @@ export function Toolbar({
   /** Retract the panel overlay → native stars list (+ floating re-mount button). */
   onTogglePanel?: () => void;
   theme: 'dark' | 'light';
-  searchRef: React.RefObject<HTMLInputElement>;
+  searchRef: React.MutableRefObject<HTMLInputElement | null>;
 }) {
   const { m } = useI18n();
   const [account, setAccount] = useState<Account | null>(null);

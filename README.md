@@ -1,10 +1,27 @@
+[English](./README.md) · [简体中文](./README.zh-CN.md)
+
 # Better GitHub Stars Manager
 
-Better GitHub Stars Manager is a Chrome extension for people who have outgrown GitHub's native stars page.
+[![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/intro/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Latest release](https://img.shields.io/github/v/release/izumi0uu/better-github-stars-manager?logo=github&label=release)](https://github.com/izumi0uu/better-github-stars-manager/releases)
+[![License: MIT](https://img.shields.io/github/license/izumi0uu/better-github-stars-manager?logo=opensourceinitiative&logoColor=white)](./LICENSE)
 
-It turns `https://github.com/{user}?tab=stars` into a fast, local-first workspace where you can search, tag, filter, and annotate thousands of starred repositories without leaving GitHub.
+> A Chrome extension for people who have outgrown GitHub's native stars page — personal-first, zero-server, built for heavy GitHub stars users.
 
-> Personal-first, zero-server, and built for heavy GitHub stars users.
+![Better GitHub Stars Manager](public/poster/img.png)
+
+## Table of Contents
+
+- [Why Better GitHub Stars Manager?](#why-better-github-stars-manager)
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [How to Use](#how-to-use)
+- [Install](#install)
+- [Privacy and Storage](#privacy-and-storage)
+- [Development](#development)
+- [License](#license)
+- [Contributing](#contributing)
 
 ## Why Better GitHub Stars Manager?
 
@@ -17,7 +34,7 @@ Once your stars grow into the hundreds or thousands, the default experience star
 - there is no real notes layer
 - it becomes hard to revisit what you saved and why
 
-Better GitHub Stars Manager adds the missing management layer on top of GitHub Stars.
+Better GitHub Stars Manager adds the missing management layer on top of GitHub Stars. It is intentionally focused — not a GitHub replacement, not a cloud-hosted bookmarking product, and it does not star/unstar repositories for you. The goal is narrower and more practical: make GitHub Stars genuinely manageable for heavy users.
 
 ## Features
 
@@ -48,6 +65,14 @@ Better GitHub Stars Manager adds the missing management layer on top of GitHub S
 - **Local-first architecture**
   Star metadata is stored locally for speed. Your personal annotation layer can be synced without needing a custom backend.
 
+## Screenshots
+
+### Preview
+
+<img src="public/poster/img.png" alt="Better GitHub Stars Manager preview" width="1672">
+
+> This preview also serves as the source for store promo images.
+
 ## How to Use
 
 1. Install the extension in Chrome as an unpacked MV3 extension.
@@ -74,19 +99,19 @@ Then in Chrome:
 6. Create a GitHub token with the permissions below
 7. Paste the token into Options and click **Save & verify**
 
-Token setup:
-
-![Create a fine-grained token](assets/tutorial/img_01.png)
+### Token setup
 
 Create a **fine-grained personal access token** and click **Generate new token**.
 
-![Choose repository access](assets/tutorial/img_02.png)
+![Create a fine-grained token](public/tutorial/img_01.png)
 
 Use **Public repositories** for repository access.
 
-![Grant Gists permission](assets/tutorial/img_03.png)
+![Choose repository access](public/tutorial/img_02.png)
 
 Add **Gists: read and write** so cross-device sync can work.
+
+![Grant Gists permission](public/tutorial/img_03.png)
 
 Recommended GitHub token permissions:
 
@@ -109,17 +134,7 @@ Push / Pull only sync your annotation layer:
 
 There is no custom backend and no separate app account.
 
-## Current Scope
-
-Better GitHub Stars Manager is intentionally focused.
-
-It does **not** try to be:
-
-- a GitHub replacement
-- a cloud-hosted bookmarking product
-- an automation tool that stars or unstars repositories for you
-
-The goal is narrower and more practical: make GitHub Stars genuinely manageable for heavy users.
+For a store-ready privacy statement, see [docs/privacy-policy.md](docs/privacy-policy.md).
 
 ## Development
 
@@ -128,3 +143,14 @@ The goal is narrower and more practical: make GitHub Stars genuinely manageable 
 - Package release zip: `pnpm package:extension`
 
 For a full manual verification checklist, see [`docs/VERIFY.md`](docs/VERIFY.md).
+For Chrome Web Store listing copy and reviewer notes, see [`docs/chrome-web-store-submission.md`](docs/chrome-web-store-submission.md).
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
+
+Copyright (c) 2026 izumi0uu.
+
+## Contributing
+
+Issues and PRs are welcome at [the repository](https://github.com/izumi0uu/better-github-stars-manager/issues).

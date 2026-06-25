@@ -27,7 +27,7 @@ export function TagEditor({
   onChangeTags: (tags: string[]) => void;
 }) {
   const [bulk, setBulk] = useState(false);
-  const addInputRef = useRef<HTMLInputElement>(null);
+  const addInputRef = useRef<HTMLInputElement | null>(null);
   const addInput = useImeBufferedInput('');
   const bulkInput = useImeBufferedInput(tags.join(', '));
   const { m } = useI18n();

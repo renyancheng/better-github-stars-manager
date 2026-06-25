@@ -348,8 +348,9 @@ const messages: Record<Locale, MessageCatalog> = {
       themeTitle: "Toggle black/white theme",
       githubHomeTitle: "GitHub home",
       hidePanelTitle: "Hide panel (use native stars list)",
-      starRepoTitle: "Give me a star~",
-      autoAssignTitle: "Auto-assign tags from each repo's topics (no network)",
+      starRepoTitle: "Like the project? Leave a star:)",
+      autoAssignTitle:
+        "Auto-assign tags from each repo's topics (experimental)",
       autoAssignButton: "Auto assign tags",
       gistPushTitle: "Push tags to your Gist backup",
       gistPushButton: "Push",
@@ -468,7 +469,7 @@ const messages: Record<Locale, MessageCatalog> = {
     },
     options: {
       title: "Better GitHub Stars Manager — Options",
-      starRepoButton: "Star on GitHub",
+      starRepoButton: "Like the project? Leave a star:)",
       tokenHeading: "1. GitHub Token",
       tokenIntroPrefix: "Create a fine-grained PAT at",
       tokenLinkLabel: "github.com/settings/tokens",
@@ -510,7 +511,7 @@ const messages: Record<Locale, MessageCatalog> = {
         "Tags sync to and from this gist. If the same repo is edited in two places, the newer change wins.",
       gistEmpty:
         "No gist yet. One is created automatically on your first tag push.",
-      gistOpenLink: "Open this gist on GitHub",
+      gistOpenLink: "Open this gist on GitHub Gist",
     },
     repoChip: {
       untagged: "untagged",
@@ -675,7 +676,7 @@ const messages: Record<Locale, MessageCatalog> = {
       githubHomeTitle: "GitHub 首页",
       hidePanelTitle: "隐藏面板（用 GitHub 原生列表）",
       starRepoTitle: "点个Star~",
-      autoAssignTitle: "根据每个仓库的 topics 自动分配标签（不请求网络）",
+      autoAssignTitle: "根据每个仓库的 topics 自动分配标签（实验性功能）",
       autoAssignButton: "自动分配标签",
       gistPushTitle: "推送标签到你的 Gist 备份",
       gistPushButton: "Push",
@@ -793,7 +794,7 @@ const messages: Record<Locale, MessageCatalog> = {
     },
     options: {
       title: "Better GitHub Stars Manager — 选项",
-      starRepoButton: "在 GitHub 点 Star",
+      starRepoButton: "点个Star~",
       tokenHeading: "1. GitHub Token",
       tokenIntroPrefix: "在这里创建细粒度 PAT：",
       tokenLinkLabel: "github.com/settings/tokens",

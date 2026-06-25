@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Search, Trash2, X, Check } from 'lucide-react';
 import type { FilterState } from '@/ui/filter-store';
@@ -69,11 +69,12 @@ function LanguagesSection({ f, languages }: { f: FilterState; languages: [string
   const { m } = useI18n();
   const [open, setOpen] = useState(false);
   const queryInput = useImeBufferedInput('');
+  const deferredQuery = useDeferredValue(queryInput.value);
 
   const list = useMemo(() => {
-    const q = queryInput.value.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
     return q ? languages.filter(([lang]) => lang.toLowerCase().includes(q)) : languages;
-  }, [languages, queryInput.value]);
+  }, [deferredQuery, languages]);
 
   return (
     <div>
@@ -141,6 +142,7 @@ function TagsSection({
   const { m } = useI18n();
   // Tag-name search.
   const queryInput = useImeBufferedInput('');
+  const deferredQuery = useDeferredValue(queryInput.value);
   // Two-step delete: a tag pending confirmation (its name). Click trash → confirm.
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -171,7 +173,7 @@ function TagsSection({
     }
   };
 
-  const q = queryInput.value.trim().toLowerCase();
+  const q = deferredQuery.trim().toLowerCase();
   const list = q ? tagTree.tags.filter(({ name }) => name.toLowerCase().includes(q)) : tagTree.tags;
   const visible = q || showAll ? list : list.slice(0, TAG_PREVIEW);
 

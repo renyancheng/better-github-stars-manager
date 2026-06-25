@@ -23,3 +23,19 @@ export function mergeTagNames(current: string[], additions: string[]): string[] 
 export function sameTagNames(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((name, index) => name === b[index]);
 }
+
+export function shouldAdoptIncomingTextDraft(
+  currentDraft: string,
+  lastLoaded: string,
+  incoming: string,
+): boolean {
+  return currentDraft === lastLoaded && incoming !== lastLoaded;
+}
+
+export function shouldAdoptIncomingTagDraft(
+  currentDraft: string[],
+  lastLoaded: string[],
+  incoming: string[],
+): boolean {
+  return sameTagNames(currentDraft, lastLoaded) && !sameTagNames(incoming, lastLoaded);
+}

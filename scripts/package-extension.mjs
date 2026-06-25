@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import pkg from '../package.json' with { type: 'json' };
 
@@ -19,18 +20,35 @@ mkdirSync(artifactsDir, { recursive: true });
 const baseName = `better-github-stars-manager-${pkg.version}`;
 const zipPath = path.join(artifactsDir, `${baseName}.zip`);
 const checksumPath = path.join(artifactsDir, `${baseName}.zip.sha256`);
+const stageDir = mkdtempSync(path.join(os.tmpdir(), 'bgsm-package-'));
 
 rmSync(zipPath, { force: true });
 rmSync(checksumPath, { force: true });
 
 try {
+  cpSync(distDir, stageDir, {
+    recursive: true,
+    filter(src) {
+      if (src === distDir) return true;
+
+      const rel = path.relative(distDir, src).split(path.sep).join('/');
+      if (rel === '.DS_Store' || rel.endsWith('/.DS_Store')) return false;
+      if (rel === 'poster' || rel.startsWith('poster/')) return false;
+      if (rel === 'store' || rel.startsWith('store/')) return false;
+
+      return true;
+    },
+  });
+
   execFileSync('zip', ['-qr', zipPath, '.'], {
-    cwd: distDir,
+    cwd: stageDir,
     stdio: 'inherit',
   });
 } catch (error) {
   console.error('❌ Failed to create extension zip. Ensure the "zip" command is available.');
   throw error;
+} finally {
+  rmSync(stageDir, { recursive: true, force: true });
 }
 
 const digest = createHash('sha256').update(readFileSync(zipPath)).digest('hex');

@@ -19,6 +19,10 @@ console.log('IME helpers:');
 test('detects the native composition flag', () => {
   assert.equal(isImeComposing({ nativeEvent: { isComposing: true } }), true);
   assert.equal(isImeComposing({ nativeEvent: { isComposing: false } }), false);
+  assert.equal(
+    isImeComposing({ nativeEvent: { inputType: 'insertCompositionText' } }),
+    true,
+  );
   assert.equal(isImeComposing({ nativeEvent: {} }), false);
   assert.equal(isImeComposing(undefined), false);
 });
@@ -35,6 +39,10 @@ test('blocks submit-like actions while composition is still active', () => {
   assert.equal(
     shouldIgnoreImeAction({ nativeEvent: { isComposing: false } }, composingRef),
     false,
+  );
+  assert.equal(
+    shouldIgnoreImeAction({ nativeEvent: { keyCode: 229 } }, composingRef),
+    true,
   );
 });
 

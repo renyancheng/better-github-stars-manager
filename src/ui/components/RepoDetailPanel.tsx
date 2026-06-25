@@ -6,11 +6,17 @@ import { suggestTags } from '@/ui/suggest';
 import { bgCall } from '@/utils/messaging';
 import { TagEditor } from './TagEditor';
 import { SaveActionButton, type SaveActionPhase } from './save-action-button';
-import { mergeTagNames, sameTagNames } from './tag-draft';
+import {
+  mergeTagNames,
+  sameTagNames,
+  shouldAdoptIncomingTagDraft,
+  shouldAdoptIncomingTextDraft,
+} from './tag-draft';
 import { Badge } from '@/ui/shadcn/badge';
 import { Button } from '@/ui/shadcn/button';
 import { Textarea } from '@/ui/shadcn/textarea';
 import { Separator } from '@/ui/shadcn/separator';
+import { useImeBufferedInput } from '@/ui/hooks/use-ime-input';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 
@@ -43,6 +49,7 @@ export function RepoDetailPanel({
   hasNext: boolean;
 }) {
   const myTags = tag?.tags ?? [];
+  const myTagsKey = myTags.join('\u0000');
   const notes = tag?.notes ?? '';
   const { m } = useI18n();
 
@@ -53,6 +60,9 @@ export function RepoDetailPanel({
   const [notesSavePhase, setNotesSavePhase] = useState<SaveActionPhase>('idle');
   const draftTagsRef = useRef(myTags);
   const draftNotesRef = useRef(notes);
+  const loadedRepoRef = useRef(star.full_name);
+  const loadedTagsRef = useRef(myTags);
+  const loadedNotesRef = useRef(notes);
   const tagsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -69,13 +79,36 @@ export function RepoDetailPanel({
   }, []);
 
   useEffect(() => {
-    draftTagsRef.current = myTags;
-    draftNotesRef.current = notes;
-    setDraftTags(myTags);
-    setDraftNotes(notes);
-    resetSavePhase(setTagsSavePhase, tagsTimerRef);
-    resetSavePhase(setNotesSavePhase, notesTimerRef);
-  }, [star.full_name, myTags, notes]);
+    const repoChanged = loadedRepoRef.current !== star.full_name;
+
+    if (repoChanged) {
+      loadedRepoRef.current = star.full_name;
+      loadedTagsRef.current = myTags;
+      loadedNotesRef.current = notes;
+      draftTagsRef.current = myTags;
+      draftNotesRef.current = notes;
+      setDraftTags(myTags);
+      setDraftNotes(notes);
+      resetSavePhase(setTagsSavePhase, tagsTimerRef);
+      resetSavePhase(setNotesSavePhase, notesTimerRef);
+      return;
+    }
+
+    if (shouldAdoptIncomingTagDraft(draftTagsRef.current, loadedTagsRef.current, myTags)) {
+      draftTagsRef.current = myTags;
+      setDraftTags(myTags);
+      resetSavePhase(setTagsSavePhase, tagsTimerRef);
+    }
+
+    if (shouldAdoptIncomingTextDraft(draftNotesRef.current, loadedNotesRef.current, notes)) {
+      draftNotesRef.current = notes;
+      setDraftNotes(notes);
+      resetSavePhase(setNotesSavePhase, notesTimerRef);
+    }
+
+    loadedTagsRef.current = myTags;
+    loadedNotesRef.current = notes;
+  }, [star.full_name, myTagsKey, notes]);
 
   useEffect(() => () => {
     if (tagsTimerRef.current) clearTimeout(tagsTimerRef.current);
@@ -98,6 +131,8 @@ export function RepoDetailPanel({
     setDraftNotes(nextNotes);
   };
 
+  const notesInput = useImeBufferedInput(draftNotes, updateDraftNotes);
+
   const saveTags = async () => {
     const nextTags = draftTagsRef.current;
     if (sameTagNames(nextTags, myTags)) return;
@@ -115,7 +150,7 @@ export function RepoDetailPanel({
   };
 
   const saveNotes = async () => {
-    const nextNotes = draftNotesRef.current;
+    const nextNotes = notesInput.value;
     if (nextNotes === notes) return;
 
     let ok = false;
@@ -249,8 +284,7 @@ export function RepoDetailPanel({
         <Separator />
         <Section title={m.repoDetail.notes}>
           <Textarea
-            value={draftNotes}
-            onChange={(e) => updateDraftNotes(e.target.value)}
+            {...notesInput.inputProps}
             placeholder={m.repoDetail.notesPlaceholder}
             rows={4}
           />
