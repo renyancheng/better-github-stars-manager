@@ -2,7 +2,7 @@
 
 # Better GitHub Stars Manager
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Install%20Now-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa?hl=en)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Install%20Now-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa)
 [![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Latest release](https://img.shields.io/github/v/release/izumi0uu/better-github-stars-manager?logo=github&label=release)](https://github.com/izumi0uu/better-github-stars-manager/releases)
@@ -11,7 +11,7 @@
 > A Chrome extension for heavy GitHub users — local-first, zero-server, personal. It turns `https://github.com/{user}?tab=stars` into a fast, searchable, taggable, filterable, annotatable workspace so you can manage thousands of stars without leaving GitHub.
 
 Install from the Chrome Web Store:
-https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa?hl=en
+[Get it on the Chrome Web Store](https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa)
 
 ![Better GitHub Stars Manager](public/poster/img_01.png)
 
@@ -72,8 +72,8 @@ Better GitHub Stars Manager makes GitHub Stars genuinely manageable for heavy us
 ## Screenshots
 
 <p align="center">
-  <img src="public/store/screenshots/screenshot-plugin.png" alt="Better GitHub Stars Manager Plugin" width="300">
   <img src="public/poster/img_02.png" alt="Better GitHub Stars Manager running on GitHub Stars" width="920">
+  <img src="public/store/screenshots/screenshot-plugin.png" alt="Better GitHub Stars Manager Plugin" width="300">
 </p>
 
 ## How to Use
@@ -89,7 +89,7 @@ Better GitHub Stars Manager makes GitHub Stars genuinely manageable for heavy us
 
 Install Better GitHub Stars Manager from the Chrome Web Store:
 
-https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa
+[Get it on the Chrome Web Store](https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa)
 
 Then:
 

@@ -2,7 +2,7 @@
 
 # Better GitHub Stars Manager
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-立即安装-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa?authuser=0&hl=zh-CN)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-立即安装-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa)
 [![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Latest release](https://img.shields.io/github/v/release/izumi0uu/better-github-stars-manager?logo=github&label=release)](https://github.com/izumi0uu/better-github-stars-manager/releases)
@@ -11,7 +11,7 @@
 > 一个为重度 GitHub 用户打造的 Chrome 扩展 —— 本地优先、零服务端、个人专属。它把 `https://github.com/{user}?tab=stars` 变成一个可搜索、可打标签、可筛选、可批注的快速工作台,管理成千上万个 star，而不必离开 GitHub。
 
 Chrome 商店安装地址:
-https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa?authuser=0&hl=zh-CN
+[前往 Chrome 商店下载](https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa)
 
 ![Better GitHub Stars Manager](public/poster/img_01.png)
 
@@ -72,8 +72,8 @@ Better GitHub Stars Manager 让 GitHub Stars 对重度用户真正可管理。
 ## 截图
 
 <p align="center">
-  <img src="public/store/screenshots/screenshot-plugin.png" alt="Better GitHub Stars Manager Plugin" width="300">
   <img src="public/poster/img_02.png" alt="Better GitHub Stars Manager 在 GitHub Stars Main page" width="920">
+  <img src="public/store/screenshots/screenshot-plugin.png" alt="Better GitHub Stars Manager Plugin" width="300">
 </p>
 
 ## 如何使用
@@ -89,7 +89,7 @@ Better GitHub Stars Manager 让 GitHub Stars 对重度用户真正可管理。
 
 Chrome 商店安装地址:
 
-https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa
+[前往 Chrome 商店下载](https://chromewebstore.google.com/detail/better-github-stars-manag/jbiacpcceoffcnmpepifoegagjopjpfa)
 
 然后:
 
