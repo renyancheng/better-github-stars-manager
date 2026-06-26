@@ -314,7 +314,6 @@ export function ManagerPanel() {
                 failedInfo={info}
                 onOpenOptions={() => bgCall('openOptions').catch(() => {})}
                 onRetry={() => void doSync('syncFull', m.popup.syncFull)}
-                onDismiss={() => void dismissOnboarding()}
               />
             ) : (
               <>
@@ -404,9 +403,9 @@ export function ManagerPanel() {
         {statusLoaded && status?.onboardingStage === 'coach' && coachStep !== null && (
           <CoachOverlay
             step={coachStep}
-            total={3}
+            total={4}
             rootRef={rootRef}
-            onNext={() => setCoachStep((s) => (s === null ? s : Math.min(s + 1, 2)))}
+            onNext={() => setCoachStep((s) => (s === null ? s : Math.min(s + 1, 3)))}
             onBack={() => setCoachStep((s) => (s === null ? s : Math.max(s - 1, 0)))}
             onFinish={() => void finishCoach()}
             onSkip={() => void skipCoach()}
@@ -437,13 +436,11 @@ function OnboardingCard({
   failedInfo,
   onOpenOptions,
   onRetry,
-  onDismiss,
 }: {
   stage: SyncStatus['onboardingStage'];
   failedInfo: string | null;
   onOpenOptions: () => void;
   onRetry: () => void;
-  onDismiss: () => void;
 }) {
   const { m } = useI18n();
 
@@ -493,21 +490,21 @@ function OnboardingCard({
             <Spinner className="size-4" />
             <span>{m.onboarding.syncingBody}</span>
           </div>
-        ) : stage === 'empty_library' ? (
-          <p className="text-muted-foreground">{m.manager.emptyState}</p>
         ) : (
           <p className="text-muted-foreground">{m.manager.emptyState}</p>
         )}
-
-        <Button variant="ghost" size="sm" onClick={onDismiss} className="mt-4 w-full">
-          {m.onboarding.gotIt}
-        </Button>
       </div>
     </div>
   );
 }
 
-const COACH_TARGETS = ['sync', 'tags', 'repo'] as const;
+const COACH_TARGETS = ['sync', 'tags', 'repo', 'hide-panel'] as const;
+const COACH_SPOT_PADDING: Record<(typeof COACH_TARGETS)[number], number> = {
+  sync: 4,
+  tags: 10,
+  repo: 10,
+  'hide-panel': 4,
+};
 
 function CoachOverlay({
   step,
@@ -527,7 +524,9 @@ function CoachOverlay({
   onSkip: () => void;
 }) {
   const { m } = useI18n();
-  const targetSel = `[data-coach-target="${COACH_TARGETS[step]}"]`;
+  const target = COACH_TARGETS[step];
+  const targetSel = `[data-coach-target="${target}"]`;
+  const padding = COACH_SPOT_PADDING[target];
 
   const [spot, setSpot] = useState<{ left: number; top: number; w: number; h: number } | null>(null);
   const measure = () => {
@@ -542,36 +541,50 @@ function CoachOverlay({
   useEffect(() => {
     const root = rootRef.current;
     const el = root?.querySelector<HTMLElement>(targetSel);
-    if (el) {
-      el.classList.add('gsm-coach-highlight');
-      el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-    }
+    if (!root || !el) return;
+    // 'instant' so the element is in place before we measure; a smooth scroll is
+    // async and would leave the spotlight at a mid-scroll rect.
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
     measure();
+    // Re-measure on the next frame and on any in-panel scroll until it settles.
+    const raf = requestAnimationFrame(measure);
+    let settles = 0;
+    const onScroll = () => {
+      measure();
+      if (settles++ > 12) window.removeEventListener('scroll', onScroll, true);
+    };
+    window.addEventListener('scroll', onScroll, true);
     const onResize = () => measure();
     window.addEventListener('resize', onResize);
     return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', onResize);
-      root?.querySelectorAll('.gsm-coach-highlight').forEach((n) => n.classList.remove('gsm-coach-highlight'));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, targetSel, rootRef]);
 
-  const titles = [m.onboarding.coachStep1Title, m.onboarding.coachStep2Title, m.onboarding.coachStep3Title];
-  const bodies = [m.onboarding.coachStep1Body, m.onboarding.coachStep2Body, m.onboarding.coachStep3Body];
+  const titles = [m.onboarding.coachStep1Title, m.onboarding.coachStep2Title, m.onboarding.coachStep3Title, m.onboarding.coachStep4Title];
+  const bodies = [m.onboarding.coachStep1Body, m.onboarding.coachStep2Body, m.onboarding.coachStep3Body, m.onboarding.coachStep4Body];
   const isLast = step === total - 1;
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30">
+    // Full-screen click shield: blocks pointer events from reaching the page beneath
+    // (toolbar buttons can't be clicked OR hovered). Several highlights are destructive
+    // if clicked — step 1 would start a real sync, step 4 would unmount the panel and
+    // kill the tour. The card below opts back into pointer-events-auto.
+    <div className="pointer-events-auto absolute inset-0 z-50">
       {spot && (
         <div
-          className="absolute"
+          className="gsm-coach-spotlight absolute"
           style={{
-            left: spot.left - 10,
-            top: spot.top - 10,
-            width: spot.w + 20,
-            height: spot.h + 20,
+            left: spot.left - padding,
+            top: spot.top - padding,
+            width: spot.w + padding * 2,
+            height: spot.h + padding * 2,
             borderRadius: 10,
-            boxShadow: '0 0 0 9999px hsl(var(--background) / 0.6)',
+            border: '2px solid hsl(var(--primary))',
+            boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
           }}
         />
       )}
@@ -591,7 +604,7 @@ function CoachOverlay({
             <Button variant="outline" size="sm" onClick={onBack}>{m.onboarding.coachBack}</Button>
           )}
           <Button size="sm" onClick={isLast ? onFinish : onNext}>
-            {isLast ? m.onboarding.coachDone : m.onboarding.coachNext}
+            {isLast ? m.onboarding.gotIt : m.onboarding.coachNext}
           </Button>
         </div>
       </div>
