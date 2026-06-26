@@ -111,6 +111,17 @@ function injectPanel(): void {
   root.style.cssText = 'width:100%;height:100%;';
   shadow.appendChild(root);
 
+  // GitHub's site-wide `s`/`/` shortcuts live on `document`; a keystroke inside
+  // this shadow root is retargeted to the host there, so GitHub's "am I in a
+  // field?" guard fails and it steals focus from our inputs. Stop the event at
+  // the shadow boundary — but only for editable fields, so `/` on the body still
+  // reaches ManagerPanel's window listener (the `/`→focus-search shortcut).
+  shadow.addEventListener('keydown', (e) => {
+    const t = e.target as HTMLElement | null;
+    const tag = t?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || t?.isContentEditable) e.stopPropagation();
+  }, true);
+
   // Insert the host, hiding GitHub's native chrome behind the overlay.
   const main = document.querySelector('main') ?? document.querySelector('[data-pjax-container]') ?? document.body;
   main.parentElement?.insertBefore(host, main);
