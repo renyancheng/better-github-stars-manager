@@ -10,7 +10,7 @@
     "package:extension": "node scripts/package-extension.mjs",
     "prepare": "node scripts/setup-hooks.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/commit-message.test.mjs && node tests/puppeteer-runtime.test.mjs && node --experimental-strip-types tests/ime-input.test.mjs && node --experimental-strip-types tests/tag-draft.test.mjs && node --experimental-strip-types tests/logic.test.ts && tsx tests/integration.test.ts && tsx tests/shape.test.ts && tsx tests/token-probe-and-status-regression.test.ts && tsx tests/rescan-regression.test.ts",
+    "test": "node tests/commit-message.test.mjs && node tests/puppeteer-runtime.test.mjs && node --experimental-strip-types tests/ime-input.test.mjs && node --experimental-strip-types tests/tag-draft.test.mjs && node --experimental-strip-types tests/logic.test.ts && tsx tests/sync-flow.test.ts && tsx tests/integration.test.ts && tsx tests/shape.test.ts && tsx tests/token-probe-and-status-regression.test.ts && tsx tests/rescan-regression.test.ts",
     "test:logic": "node --experimental-strip-types tests/logic.test.ts",
     "test:commit-message": "node tests/commit-message.test.mjs",
     "test:ime": "node --experimental-strip-types tests/ime-input.test.mjs",

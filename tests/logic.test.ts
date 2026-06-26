@@ -12,6 +12,7 @@ import {
   normalizeOnboardingStage,
   resolveOnboardingStageAfterSync,
 } from '../src/onboarding/state.ts';
+import { autoTagPhaseForSync } from '../src/background/sync-flow.ts';
 import { mountState, pageOwner } from '../src/content/stars-page/mount-state.ts';
 import { pruneFavoriteOverrides, resolveFavoriteState } from '../src/ui/favorite-state.ts';
 import { pickInitialSyncAction } from '../src/ui/initial-sync.ts';
@@ -206,6 +207,17 @@ test('only non-coach, non-done stages render the onboarding card', () => {
   assert.equal(isOnboardingCardStage('syncing'), true);
   assert.equal(isOnboardingCardStage('coach'), false);
   assert.equal(isOnboardingCardStage('done'), false);
+});
+
+console.log('\nSync auto-tag policy:');
+test('incremental sync auto-tags in incremental phase', () => {
+  assert.equal(autoTagPhaseForSync('syncIncremental'), 'incremental');
+});
+test('full sync auto-tags in full phase', () => {
+  assert.equal(autoTagPhaseForSync('syncFull'), 'full');
+});
+test('rescan does not auto-tag', () => {
+  assert.equal(autoTagPhaseForSync('syncRescan'), null);
 });
 
 console.log('\nAuto-suggest:');

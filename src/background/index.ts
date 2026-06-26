@@ -11,6 +11,7 @@ import {
   normalizeOnboardingStage,
   stageMarksOnboardingSeen,
 } from '@/onboarding/state';
+import { runSyncActionWithAutoTag } from './sync-flow';
 
 /**
  * Background SW — sync orchestrator and sole owner of the extension-origin
@@ -143,8 +144,7 @@ async function getStatusPayload() {
 /**
  * Auto-tag every star from its topics (NOT language — language is a sidebar
  * filter, not a tag; full rationale in suggest.ts). Pure-local, idempotent,
- * preserves notes. Manual-only experimental action; excluded names are skipped
- * so deleted tags don't resurrect.
+ * preserves notes. Excluded names are skipped so deleted tags don't resurrect.
  */
 async function autoTagAll(
   progressLabel: string,
@@ -156,6 +156,7 @@ async function autoTagAll(
   const existingTags = await idbTagStore.getMany(stars.map((star) => star.full_name));
   let tagged = 0;
   const total = stars.length;
+  console.log('[GSM] autoTag START | stars:', total, '| excluded:', excluded.size, '| phase:', phase);
   for (let i = 0; i < stars.length; i++) {
     const star = stars[i];
     const existing = existingTags.get(star.full_name)?.tags ?? [];
@@ -178,6 +179,7 @@ async function autoTagAll(
     }
     if (done % 100 === 0) await Promise.resolve();
   }
+  console.log('[GSM] autoTag END | newly tagged:', tagged, 'of', total);
   return { tagged };
 }
 
@@ -233,35 +235,53 @@ async function handle(req: Req): Promise<Res> {
       case 'syncIncremental': {
         const m = await getLocaleMessages();
         if (!(await authStore.hasToken())) return { ok: false, error: m.background.noToken };
-        const r = await run(async () => {
+        const result = await run(async () => {
           setProgress({ phase: 'incremental', done: 0, total: null, message: m.background.incrementalSyncing });
-          return githubStarSource.syncIncremental();
+          return runSyncActionWithAutoTag(
+            'syncIncremental',
+            () => githubStarSource.syncIncremental(),
+            (phase) => autoTagAll(m.background.autoAssignTagging, (p) => setProgress(p), phase),
+          );
         });
         broadcastDataChanged();
-        setIdleMessage(m.background.incrementalDone(r.added));
-        return { ok: true, data: r };
+        const idle = result.autoTag?.tagged
+          ? `${m.background.incrementalDone(result.sync.added)} · ${m.background.autoAssignDone(result.autoTag.tagged)}`
+          : m.background.incrementalDone(result.sync.added);
+        setIdleMessage(idle);
+        return { ok: true, data: { ...result.sync, tagged: result.autoTag?.tagged ?? 0 } };
       }
       case 'syncFull': {
         const m = await getLocaleMessages();
         if (!(await authStore.hasToken())) return { ok: false, error: m.background.noToken };
-        const r = await run(async () => {
+        const result = await run(async () => {
           setProgress({ phase: 'full', done: 0, total: null, message: m.background.fetchingPages(1) });
-          return githubStarSource.syncFull((p) => setProgress(p));
+          return runSyncActionWithAutoTag(
+            'syncFull',
+            () => githubStarSource.syncFull((p) => setProgress(p)),
+            (phase) => autoTagAll(m.background.autoAssignTagging, (p) => setProgress(p), phase),
+          );
         });
         broadcastDataChanged();
-        setIdleMessage(m.background.fullDone(r.added));
-        return { ok: true, data: r };
+        const idle = result.autoTag?.tagged
+          ? `${m.background.fullDone(result.sync.added)} · ${m.background.autoAssignDone(result.autoTag.tagged)}`
+          : m.background.fullDone(result.sync.added);
+        setIdleMessage(idle);
+        return { ok: true, data: { ...result.sync, tagged: result.autoTag?.tagged ?? 0 } };
       }
       case 'syncRescan': {
         const m = await getLocaleMessages();
         if (!(await authStore.hasToken())) return { ok: false, error: m.background.noToken };
-        const r = await run(async () => {
+        const result = await run(async () => {
           setProgress({ phase: 'rescan', done: 0, total: null, message: m.background.rescanningPages(1) });
-          return githubStarSource.syncRescan((p) => setProgress(p));
+          return runSyncActionWithAutoTag(
+            'syncRescan',
+            () => githubStarSource.syncRescan((p) => setProgress(p)),
+            (phase) => autoTagAll(m.background.autoAssignTagging, (p) => setProgress(p), phase),
+          );
         });
         broadcastDataChanged();
-        setIdleMessage(m.background.rescanDone(r.tombstoned, r.revived));
-        return { ok: true, data: r };
+        setIdleMessage(m.background.rescanDone(result.sync.tombstoned, result.sync.revived));
+        return { ok: true, data: result.sync };
       }
       case 'autoAssignTags': {
         const m = await getLocaleMessages();
