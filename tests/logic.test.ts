@@ -67,7 +67,7 @@ test('remote-only repo → added to local', () => {
 // --- Filter logic (mirrors query.ts filter) ---
 interface S { full_name: string; description: string; language: string | null; topics: string[]; notes?: string; tombstone: boolean; starred_at: string; pushed_at: string; stargazers_count: number; }
 
-function filterStars(stars: S[], opts: { query?: string; languages?: string[]; tags?: string[]; showTombstone?: boolean; onlyUntagged?: boolean; tagsByRepo?: Map<string, string[]> }): S[] {
+function filterStars(stars: S[], opts: { query?: string; languages?: string[]; tags?: string[]; showTombstone?: boolean; onlyFavorite?: boolean; onlyUntagged?: boolean; tagsByRepo?: Map<string, string[]>; favoritesByRepo?: Map<string, boolean> }): S[] {
   const q = (opts.query ?? '').toLowerCase();
   const langSet = opts.languages?.length ? new Set(opts.languages) : null;
   const tagSet = opts.tags?.length ? new Set(opts.tags) : null;
@@ -75,6 +75,7 @@ function filterStars(stars: S[], opts: { query?: string; languages?: string[]; t
     if (!opts.showTombstone && s.tombstone) return false;
     if (langSet && (s.language === null || !langSet.has(s.language))) return false;
     const myTags = opts.tagsByRepo?.get(s.full_name) ?? [];
+    if (opts.onlyFavorite && !opts.favoritesByRepo?.get(s.full_name)) return false;
     if (opts.onlyUntagged && myTags.length > 0) return false;
     if (tagSet && !myTags.some((t) => tagSet.has(t))) return false;
     if (q) {
@@ -92,6 +93,7 @@ const sample: S[] = [
   { full_name: 'c/old', description: 'archived thing', language: 'Python', topics: [], notes: '', tombstone: true, starred_at: '2026-01-01', pushed_at: '2025-01-01', stargazers_count: 5 },
 ];
 const tagsByRepo = new Map([['a/ai-tool', ['ai']], ['b/rust-lib', ['rust']]]);
+const favoritesByRepo = new Map([['b/rust-lib', true]]);
 
 test('hide tombstone by default', () => {
   assert.equal(filterStars(sample, {}).length, 2);
@@ -116,6 +118,11 @@ test('full-text search hits notes', () => {
 });
 test('filter by tag', () => {
   const r = filterStars(sample, { tags: ['rust'], tagsByRepo });
+  assert.equal(r.length, 1);
+  assert.equal(r[0].full_name, 'b/rust-lib');
+});
+test('onlyFavorite keeps favorited repos only', () => {
+  const r = filterStars(sample, { onlyFavorite: true, favoritesByRepo, tagsByRepo });
   assert.equal(r.length, 1);
   assert.equal(r[0].full_name, 'b/rust-lib');
 });
