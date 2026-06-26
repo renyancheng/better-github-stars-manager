@@ -5,6 +5,7 @@ import { Button } from '@/ui/shadcn/button';
 import { Progress } from '@/ui/shadcn/progress';
 import { Separator } from '@/ui/shadcn/separator';
 import { Spinner } from '@/ui/shadcn/spinner';
+import { REPO_URL } from '@/lib/links';
 import { useI18n } from '@/i18n';
 
 interface ConnResult {
@@ -129,10 +130,17 @@ export function Popup() {
 
   return (
     <div className="flex flex-col gap-2 p-3 font-sans" style={{ minWidth: 280 }}>
-      <h2 className="m-0 inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground">
-        <Star className="size-4 fill-current text-primary" />
-        {m.popup.title}
-      </h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="m-0 inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground">
+          <Star className="size-4 fill-current text-primary" />
+          {m.popup.title}
+        </h2>
+        <Button asChild variant="ghost" size="icon" title={m.popup.starRepoTitle}>
+          <a href={REPO_URL} target="_blank" rel="noreferrer">
+            <Star className="size-4" />
+          </a>
+        </Button>
+      </div>
 
       {!hasToken && (
         <div className="flex items-center gap-2 text-[13px] text-warning">

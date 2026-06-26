@@ -158,6 +158,8 @@ export interface MessageCatalog {
     debugState: string;
     openStars: string;
     options: string;
+    /** Tooltip for the popup header star-repo link. */
+    starRepoTitle: string;
     testing: string;
     rate: (remaining: string | null, limit: string | null) => string;
     scopes: (scopes: string | null) => string;
@@ -467,6 +469,7 @@ const messages: Record<Locale, MessageCatalog> = {
       debugState: "Debug extension state",
       openStars: "Open my stars page",
       options: "Options…",
+      starRepoTitle: "Like the project? Leave a star:)",
       testing: "testing…",
       rate: (remaining, limit) => `rate: ${remaining}/${limit} remaining`,
       scopes: (scopes) => `scopes: ${scopes ?? "(fine-grained: none shown)"}`,
@@ -799,6 +802,7 @@ const messages: Record<Locale, MessageCatalog> = {
       debugState: "调试扩展状态",
       openStars: "打开我的 stars 页面",
       options: "选项…",
+      starRepoTitle: "点个Star~",
       testing: "测试中…",
       rate: (remaining, limit) => `限额: ${remaining}/${limit} 剩余`,
       scopes: (scopes) => `权限: ${scopes ?? "（细粒度 token 不显示 scope）"}`,
