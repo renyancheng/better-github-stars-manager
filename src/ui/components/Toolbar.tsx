@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Sun, Moon, Search, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow, X,
-  Tags, Upload, Download, AlertTriangle, ExternalLink, Home, EyeOff, Star,
+  Tags, Upload, Download, AlertTriangle, ExternalLink, Home, EyeOff, Star, RefreshCcw,
 } from 'lucide-react';
 import { CONFIG_STORAGE_KEY } from '@/auth/auth-store';
 import { REPO_URL } from '@/lib/links';
@@ -102,7 +102,7 @@ export function Toolbar({
 }) {
   const { m } = useI18n();
   const [account, setAccount] = useState<Account | null>(null);
-  const syncing = status?.progress && status.progress.phase !== 'idle';
+  const syncing = !!status?.inFlight && status.progress.phase !== 'idle';
   const phase = syncing ? status!.progress : null;
   const actionBusy = busy || syncing || pendingAction !== null;
   const progressValue = phase && phase.total ? Math.max(1, Math.min(100, Math.round((phase.done / phase.total) * 100))) : null;
@@ -128,6 +128,14 @@ export function Toolbar({
 
     const listener = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
       if (areaName !== 'local' || !changes[CONFIG_STORAGE_KEY]) return;
+      const oldCfg = changes[CONFIG_STORAGE_KEY].oldValue as Account | undefined;
+      const newCfg = changes[CONFIG_STORAGE_KEY].newValue as Account | undefined;
+      if (
+        oldCfg?.username === newCfg?.username &&
+        oldCfg?.avatarUrl === newCfg?.avatarUrl &&
+        oldCfg?.displayName === newCfg?.displayName &&
+        oldCfg?.gistId === newCfg?.gistId
+      ) return;
       void refreshAccount();
     };
 
@@ -227,6 +235,22 @@ export function Toolbar({
           </ActionIcon>
           {m.toolbar.syncButton}
           {pendingAction === 'syncIncremental' && progressCount && (
+            <span className="ml-1 tabular-nums text-[10px] opacity-80">{progressCount}</span>
+          )}
+        </TButton>
+
+        <TButton onClick={() => onSync('syncFull', m.toolbar.fullSyncButton)} disabled={actionBusy} tip={m.toolbar.fullSyncTitle} seenTooltips={seenTooltips} onStatusPatch={onStatusPatch} data-coach-target="full-sync">
+          <ActionIcon phase={successAction === 'syncFull' ? 'ok' : pendingAction === 'syncFull' ? 'busy' : 'idle'}>
+            {successAction === 'syncFull' ? (
+              <SuccessCheck data-icon="inline-start" />
+            ) : pendingAction === 'syncFull' ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <RefreshCcw className="size-4" data-icon="inline-start" />
+            )}
+          </ActionIcon>
+          {m.toolbar.fullSyncButton}
+          {pendingAction === 'syncFull' && progressCount && (
             <span className="ml-1 tabular-nums text-[10px] opacity-80">{progressCount}</span>
           )}
         </TButton>

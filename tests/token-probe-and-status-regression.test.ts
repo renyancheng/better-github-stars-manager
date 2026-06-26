@@ -6,7 +6,7 @@ import {
   translateError,
 } from '../src/api/errors';
 import { probeTokenCapabilities } from '../src/auth/token-probe';
-import { mergeStatusPatch, type SyncStatus } from '../src/utils/messaging';
+import { mergeStatusPatch, mergeStatusSnapshot, type SyncStatus } from '../src/utils/messaging';
 
 const pass: string[] = [];
 const fail: string[] = [];
@@ -106,11 +106,34 @@ test('mergeStatusPatch updates seenTooltips without dropping live progress', () 
     hasToken: true,
     seenOnboarding: false,
     seenTooltips: 0,
+    inFlight: true,
   };
   const next = mergeStatusPatch(current, { seenTooltips: 2 });
   assert.equal(next.seenTooltips, 2);
   assert.deepEqual(next.progress, current.progress);
   assert.equal(next.hasToken, true);
+  assert.equal(next.inFlight, true);
+});
+
+test('mergeStatusSnapshot keeps live progress when a restored snapshot is idle', () => {
+  const current: SyncStatus = {
+    progress: { phase: 'full', done: 8, total: 20, message: 'Fetching…' },
+    hasToken: true,
+    seenOnboarding: true,
+    seenTooltips: 3,
+    inFlight: true,
+  };
+  const snapshot: SyncStatus = {
+    progress: { phase: 'idle', done: 0, total: null, message: 'Last sync done' },
+    hasToken: true,
+    seenOnboarding: true,
+    seenTooltips: 3,
+    inFlight: false,
+  };
+  const merged = mergeStatusSnapshot(current, snapshot);
+  assert.ok(merged);
+  assert.deepEqual(merged!.progress, current.progress);
+  assert.equal(merged!.inFlight, true);
 });
 
 test('translateError keeps split token-probe codes distinct', () => {

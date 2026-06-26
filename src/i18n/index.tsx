@@ -42,6 +42,8 @@ export interface MessageCatalog {
     toggleSortDir: string;
     syncTitle: string;
     syncButton: string;
+    fullSyncTitle: string;
+    fullSyncButton: string;
     themeTitle: string;
     /** Tooltip for the GitHub-home icon button (jump back to github.com). */
     githubHomeTitle: string;
@@ -216,14 +218,18 @@ export interface MessageCatalog {
   background: {
     noToken: string;
     incrementalSyncing: string;
-    incrementalDone: (added: number, autoTagged: number) => string;
-    fullDone: (autoTagged: number) => string;
-    rescanDone: (autoTagged: number) => string;
+    incrementalDone: (added: number) => string;
+    fullDone: (count: number) => string;
+    rescanDone: (tombstoned: number, revived: number) => string;
+    autoAssignTagging: string;
     autoAssignDone: (tagged: number) => string;
     fetchingPages: (total: number) => string;
+    fetchingPageRetry: (page: number, attempt: number) => string;
     syncedRepos: (count: number) => string;
     rescanningPages: (total: number) => string;
-    pushingTags: string;
+    reconcilingLocal: (count: number) => string;
+    rescanSummary: (tombstoned: number, revived: number) => string;
+  pushingTags: string;
     pullingTags: string;
     gistPushDone: (count: number) => string;
     gistPushRecreated: string;
@@ -353,6 +359,8 @@ const messages: Record<Locale, MessageCatalog> = {
       toggleSortDir: "Toggle sort direction",
       syncTitle: "Incrementally sync new stars",
       syncButton: "Sync",
+      fullSyncTitle: "Re-fetch your entire starred library",
+      fullSyncButton: "Full Sync",
       themeTitle: "Toggle black/white theme",
       githubHomeTitle: "GitHub home",
       hidePanelTitle: "Hide panel (use native stars list)",
@@ -536,14 +544,17 @@ const messages: Record<Locale, MessageCatalog> = {
     background: {
       noToken: "No token configured",
       incrementalSyncing: "Checking for newly starred repos…",
-      incrementalDone: (added, autoTagged) =>
-        `+${added} new · ${autoTagged} auto-tagged`,
-      fullDone: (autoTagged) => `Full sync done · ${autoTagged} auto-tagged`,
-      rescanDone: (autoTagged) => `Rescan done · ${autoTagged} auto-tagged`,
+      incrementalDone: (added) => `+${added} new`,
+      fullDone: (count) => `Full sync done · ${count} repos refreshed`,
+      rescanDone: (tombstoned, revived) => `Rescan done · ${tombstoned} removed, ${revived} restored`,
+      autoAssignTagging: "Auto-tagging repos from topics…",
       autoAssignDone: (tagged) => `Auto-assigned · ${tagged} tagged`,
       fetchingPages: (total) => `Fetching ${total} pages…`,
+      fetchingPageRetry: (page, attempt) => `Retrying page ${page} (attempt ${attempt})…`,
       syncedRepos: (count) => `Synced ${count} repos`,
       rescanningPages: (total) => `Rescanning ${total} pages…`,
+      reconcilingLocal: (count) => `Reconciling ${count} local repos…`,
+      rescanSummary: (tombstoned, revived) => `Rescan: ${tombstoned} removed from live set, ${revived} restored`,
       pushingTags: "Uploading tag snapshot to Gist…",
       pullingTags: "Pulling tags from Gist…",
       gistPushDone: (count) => `Pushed ${count} changed tag records to Gist`,
@@ -626,7 +637,7 @@ const messages: Record<Locale, MessageCatalog> = {
         "Here are the three things you'll use most. Follow along — this shows only once.",
       coachStep1Title: "Sync your stars",
       coachStep1Body:
-        "The Sync button pulls in stars you've starred since your last visit. It runs automatically on first load; click it anytime to refresh.",
+        "Sync pulls in newly starred repos since your last visit. It runs automatically on first load; click it anytime to refresh.",
       coachStep2Title: "Filter by tags",
       coachStep2Body:
         "The Tags sidebar lists all your tags, sorted by how often they're used. Click any tag (the whole row) to filter the list. Hover a tag for the delete button.",
@@ -687,6 +698,8 @@ const messages: Record<Locale, MessageCatalog> = {
       toggleSortDir: "切换排序方向",
       syncTitle: "增量同步新的 stars",
       syncButton: "Sync",
+      fullSyncTitle: "重新完整拉取你的全部 stars",
+      fullSyncButton: "Full Sync",
       themeTitle: "切换黑白主题",
       githubHomeTitle: "GitHub 首页",
       hidePanelTitle: "隐藏面板（用 GitHub 原生列表）",
@@ -865,14 +878,17 @@ const messages: Record<Locale, MessageCatalog> = {
     background: {
       noToken: "未配置 token",
       incrementalSyncing: "正在检查新 star 的仓库…",
-      incrementalDone: (added, autoTagged) =>
-        `新增 ${added} 个 · 自动打标 ${autoTagged} 个`,
-      fullDone: (autoTagged) => `全量同步完成 · 自动打标 ${autoTagged} 个`,
-      rescanDone: (autoTagged) => `重扫完成 · 自动打标 ${autoTagged} 个`,
+      incrementalDone: (added) => `新增 ${added} 个`,
+      fullDone: (count) => `全量同步完成 · 刷新 ${count} 个仓库`,
+      rescanDone: (tombstoned, revived) => `重扫完成 · 移出 ${tombstoned} 个，恢复 ${revived} 个`,
+      autoAssignTagging: "正在根据 topics 自动打标签…",
       autoAssignDone: (tagged) => `已自动分配 · 打标 ${tagged} 个`,
       fetchingPages: (total) => `正在获取 ${total} 页…`,
+      fetchingPageRetry: (page, attempt) => `正在重试第 ${page} 页（第 ${attempt} 次）…`,
       syncedRepos: (count) => `已同步 ${count} 个仓库`,
       rescanningPages: (total) => `正在重扫 ${total} 页…`,
+      reconcilingLocal: (count) => `正在校对本地 ${count} 个仓库…`,
+      rescanSummary: (tombstoned, revived) => `重扫结果：移出 live 集合 ${tombstoned} 个，恢复 ${revived} 个`,
       pushingTags: "正在把标签快照上传到 Gist…",
       pullingTags: "正在从 Gist 拉取标签…",
       gistPushDone: (count) => `已向 Gist 推送 ${count} 条变更标签记录`,
@@ -994,7 +1010,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       changes: Record<string, chrome.storage.StorageChange>,
       areaName: string,
     ) => {
-      if (areaName === "local" && changes[CONFIG_STORAGE_KEY]) syncLocale();
+      if (areaName !== "local" || !changes[CONFIG_STORAGE_KEY]) return;
+      const oldCfg = changes[CONFIG_STORAGE_KEY].oldValue as Record<string, unknown> | undefined;
+      const newCfg = changes[CONFIG_STORAGE_KEY].newValue as Record<string, unknown> | undefined;
+      if (oldCfg?.locale === newCfg?.locale) return;
+      syncLocale();
     };
 
     syncLocale();

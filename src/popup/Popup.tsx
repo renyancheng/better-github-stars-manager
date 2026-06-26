@@ -110,7 +110,7 @@ export function Popup() {
 
   const p = status?.progress;
   const hasToken = status?.hasToken;
-  const syncing = !!(p && p.phase !== 'idle');
+  const syncing = !!(status?.inFlight && p && p.phase !== 'idle');
   const actionBusy = syncing || pendingAction !== null;
   const progressValue = p?.total ? Math.max(1, Math.min(100, Math.round((p.done / p.total) * 100))) : null;
   const progressCount = p?.total ? `${p.done}/${p.total}` : null;
@@ -152,7 +152,9 @@ export function Popup() {
       <div className="flex min-h-[18px] flex-col gap-1 text-xs text-muted-foreground">
         <div className="inline-flex items-center gap-2">
           {syncing && <Spinner className="size-3" />}
-          {p && p.phase !== 'idle' ? `${m.common.phase(p.phase)}: ${p.message}` : p?.message || m.popup.idle}
+          {p
+            ? `${syncing ? `${m.common.phase(p.phase)}: ` : ''}${p.message || m.popup.idle}`
+            : m.popup.idle}
         </div>
         {syncing && progressValue != null && (
           <div className="flex items-center gap-2">

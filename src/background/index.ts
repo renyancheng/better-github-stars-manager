@@ -6,7 +6,12 @@ import { db, liveStarCount } from '@/storage/db';
 import { queryStars, invalidateCache, type QueryParams, type QueryResult } from './query';
 import { suggestTags } from '@/ui/suggest';
 import { translateError } from '@/api/errors';
-import type { SyncProgress } from '@/types';
+import type { OnboardingStage, SyncProgress } from '@/types';
+import {
+  normalizeOnboardingStage,
+  stageMarksOnboardingSeen,
+} from '@/onboarding/state';
+import { runSyncActionWithAutoTag } from './sync-flow';
 
 /**
  * Background SW — sync orchestrator and sole owner of the extension-origin
@@ -37,6 +42,7 @@ type Req =
   | { type: 'getTag'; full_name: string }
   | { type: 'listExcluded' }
   | { type: 'markOnboardingSeen' }
+  | { type: 'setOnboardingStage'; stage: OnboardingStage }
   | { type: 'markTooltipSeen'; bit: number }
   | { type: 'testConnection' }
   | { type: 'openOptions' };
@@ -47,9 +53,40 @@ type Res =
 
 let inFlight: Promise<unknown> | null = null;
 let lastProgress: SyncProgress = { phase: 'idle', done: 0, total: null, message: '' };
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+function shouldPersistProgress(prev: SyncProgress, next: SyncProgress): boolean {
+  if (prev.phase !== next.phase) return true;
+  if (prev.message !== next.message) return true;
+  if (prev.total !== next.total) return true;
+  if (next.phase === 'idle') return true;
+  if (next.total == null) return next.done !== prev.done;
+  const step = Math.max(1, Math.ceil(next.total / 25));
+  return next.done === 0 || next.done === next.total || next.done - prev.done >= step;
+}
+
+async function persistProgressSnapshot(progress: SyncProgress) {
+  try {
+    await authStore.update({ lastSyncProgress: progress });
+  } catch (e) {
+    console.warn('[GSM] failed to persist progress snapshot:', e instanceof Error ? e.message : String(e));
+  }
+}
+
+function scheduleProgressPersist(prev: SyncProgress, next: SyncProgress) {
+  if (!shouldPersistProgress(prev, next)) return;
+  if (persistTimer) clearTimeout(persistTimer);
+  const delay = next.phase === 'idle' ? 0 : 350;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    void persistProgressSnapshot(next);
+  }, delay);
+}
 
 function setProgress(p: SyncProgress) {
+  const prev = lastProgress;
   lastProgress = p;
+  scheduleProgressPersist(prev, p);
   chrome.runtime.sendMessage({ type: 'progress', progress: p }).catch(() => {});
 }
 
@@ -77,18 +114,52 @@ async function run<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+async function getStatusPayload() {
+  const cfg = await authStore.getConfig();
+  const hasToken = await authStore.hasToken();
+  const onboardingStage = normalizeOnboardingStage(
+    cfg.onboardingStage,
+    cfg.seenOnboarding,
+    hasToken,
+  );
+  if (
+    onboardingStage !== cfg.onboardingStage ||
+    stageMarksOnboardingSeen(onboardingStage) !== cfg.seenOnboarding
+  ) {
+    await authStore.update({
+      onboardingStage,
+      seenOnboarding: stageMarksOnboardingSeen(onboardingStage),
+    });
+  }
+  return {
+    progress: lastProgress.phase === 'idle' && !lastProgress.message ? cfg.lastSyncProgress : lastProgress,
+    hasToken,
+    onboardingStage,
+    seenOnboarding: stageMarksOnboardingSeen(onboardingStage),
+    seenTooltips: cfg.seenTooltips,
+    inFlight: !!inFlight,
+  };
+}
+
 /**
  * Auto-tag every star from its topics (NOT language — language is a sidebar
  * filter, not a tag; full rationale in suggest.ts). Pure-local, idempotent,
- * preserves notes. Runs after each sync; excluded names are skipped so deleted
- * tags don't resurrect.
+ * preserves notes. Excluded names are skipped so deleted tags don't resurrect.
  */
-async function autoTagAll(): Promise<{ tagged: number }> {
+async function autoTagAll(
+  progressLabel: string,
+  onProgress?: (p: SyncProgress) => void,
+  phase: SyncProgress['phase'] = 'incremental',
+): Promise<{ tagged: number }> {
   const stars = await db.stars.toArray();
   const excluded = new Set(await idbTagStore.listExcluded());
+  const existingTags = await idbTagStore.getMany(stars.map((star) => star.full_name));
   let tagged = 0;
-  for (const star of stars) {
-    const existing = (await idbTagStore.get(star.full_name))?.tags ?? [];
+  const total = stars.length;
+  console.log('[GSM] autoTag START | stars:', total, '| excluded:', excluded.size, '| phase:', phase);
+  for (let i = 0; i < stars.length; i++) {
+    const star = stars[i];
+    const existing = existingTags.get(star.full_name)?.tags ?? [];
     const toAdd = suggestTags(star, existing, excluded);
     if (toAdd.length > 0) {
       const merged = Array.from(new Set([...existing, ...toAdd]));
@@ -97,7 +168,18 @@ async function autoTagAll(): Promise<{ tagged: number }> {
         tagged++;
       }
     }
+    const done = i + 1;
+    if (onProgress && (done === 1 || done === total || done % 100 === 0)) {
+      onProgress({
+        phase,
+        done,
+        total,
+        message: progressLabel,
+      });
+    }
+    if (done % 100 === 0) await Promise.resolve();
   }
+  console.log('[GSM] autoTag END | newly tagged:', tagged, 'of', total);
   return { tagged };
 }
 
@@ -140,60 +222,98 @@ async function migrateLanguageTags(): Promise<void> {
   }
 }
 
+async function setStoredOnboardingStage(stage: OnboardingStage): Promise<void> {
+  await authStore.update({
+    onboardingStage: stage,
+    seenOnboarding: stageMarksOnboardingSeen(stage),
+  });
+}
+
 async function handle(req: Req): Promise<Res> {
   try {
     switch (req.type) {
       case 'syncIncremental': {
         const m = await getLocaleMessages();
         if (!(await authStore.hasToken())) return { ok: false, error: m.background.noToken };
-        setProgress({ phase: 'incremental', done: 0, total: null, message: m.background.incrementalSyncing });
-        const r = await run(() => githubStarSource.syncIncremental());
-        const t = await autoTagAll();
+        const result = await run(async () => {
+          setProgress({ phase: 'incremental', done: 0, total: null, message: m.background.incrementalSyncing });
+          return runSyncActionWithAutoTag(
+            'syncIncremental',
+            () => githubStarSource.syncIncremental(),
+            (phase) => autoTagAll(m.background.autoAssignTagging, (p) => setProgress(p), phase),
+          );
+        });
         broadcastDataChanged();
-        setIdleMessage(m.background.incrementalDone(r.added, t.tagged));
-        return { ok: true, data: { ...r, autoTagged: t.tagged } };
+        const idle = result.autoTag?.tagged
+          ? `${m.background.incrementalDone(result.sync.added)} · ${m.background.autoAssignDone(result.autoTag.tagged)}`
+          : m.background.incrementalDone(result.sync.added);
+        setIdleMessage(idle);
+        return { ok: true, data: { ...result.sync, tagged: result.autoTag?.tagged ?? 0 } };
       }
       case 'syncFull': {
         const m = await getLocaleMessages();
         if (!(await authStore.hasToken())) return { ok: false, error: m.background.noToken };
-        const r = await run(() => githubStarSource.syncFull((p) => setProgress(p)));
-        const t = await autoTagAll();
+        const result = await run(async () => {
+          setProgress({ phase: 'full', done: 0, total: null, message: m.background.fetchingPages(1) });
+          return runSyncActionWithAutoTag(
+            'syncFull',
+            () => githubStarSource.syncFull((p) => setProgress(p)),
+            (phase) => autoTagAll(m.background.autoAssignTagging, (p) => setProgress(p), phase),
+          );
+        });
         broadcastDataChanged();
-        setIdleMessage(m.background.fullDone(t.tagged));
-        return { ok: true, data: { ...r, autoTagged: t.tagged } };
+        const idle = result.autoTag?.tagged
+          ? `${m.background.fullDone(result.sync.added)} · ${m.background.autoAssignDone(result.autoTag.tagged)}`
+          : m.background.fullDone(result.sync.added);
+        setIdleMessage(idle);
+        return { ok: true, data: { ...result.sync, tagged: result.autoTag?.tagged ?? 0 } };
       }
       case 'syncRescan': {
         const m = await getLocaleMessages();
         if (!(await authStore.hasToken())) return { ok: false, error: m.background.noToken };
-        const r = await run(() => githubStarSource.syncRescan((p) => setProgress(p)));
-        const t = await autoTagAll();
+        const result = await run(async () => {
+          setProgress({ phase: 'rescan', done: 0, total: null, message: m.background.rescanningPages(1) });
+          return runSyncActionWithAutoTag(
+            'syncRescan',
+            () => githubStarSource.syncRescan((p) => setProgress(p)),
+            (phase) => autoTagAll(m.background.autoAssignTagging, (p) => setProgress(p), phase),
+          );
+        });
         broadcastDataChanged();
-        setIdleMessage(m.background.rescanDone(t.tagged));
-        return { ok: true, data: { ...r, autoTagged: t.tagged } };
+        setIdleMessage(m.background.rescanDone(result.sync.tombstoned, result.sync.revived));
+        return { ok: true, data: result.sync };
       }
       case 'autoAssignTags': {
         const m = await getLocaleMessages();
-        const t = await autoTagAll();
+        const t = await run(async () => {
+          setProgress({ phase: 'incremental', done: 0, total: null, message: m.background.autoAssignTagging });
+          return autoTagAll(m.background.autoAssignTagging, (p) => setProgress(p), 'incremental');
+        });
         broadcastDataChanged();
         setIdleMessage(m.background.autoAssignDone(t.tagged));
         return { ok: true, data: t };
       }
       case 'gistPush': {
         const m = await getLocaleMessages();
-        setProgress({ phase: 'gist', done: 0, total: null, message: m.background.pushingTags });
-        const r = await idbTagStore.syncPush((done, total) => {
-          setProgress({ phase: 'gist', done, total, message: m.background.pushingTags });
+        const r = await run(async () => {
+          setProgress({ phase: 'gist', done: 0, total: null, message: m.background.pushingTags });
+          const result = await idbTagStore.syncPush((done, total) => {
+            setProgress({ phase: 'gist', done, total, message: m.background.pushingTags });
+          });
+          if (result.pushed > 0) setIdleMessage(m.background.gistPushDone(result.pushed));
+          else if (result.recreated) setIdleMessage(m.background.gistPushRecreated);
+          else setIdleMessage(m.background.gistPushNoChanges);
+          return result;
         });
-        if (r.pushed > 0) setIdleMessage(m.background.gistPushDone(r.pushed));
-        else if (r.recreated) setIdleMessage(m.background.gistPushRecreated);
-        else setIdleMessage(m.background.gistPushNoChanges);
         return { ok: true, data: r };
       }
       case 'gistPull': {
         const m = await getLocaleMessages();
-        setProgress({ phase: 'gist', done: 0, total: null, message: m.background.pullingTags });
-        const r = await idbTagStore.syncPull((done, total) => {
-          setProgress({ phase: 'gist', done, total, message: m.background.pullingTags });
+        const r = await run(async () => {
+          setProgress({ phase: 'gist', done: 0, total: null, message: m.background.pullingTags });
+          return idbTagStore.syncPull((done, total) => {
+            setProgress({ phase: 'gist', done, total, message: m.background.pullingTags });
+          });
         });
         broadcastDataChanged();
         if (r.missing) setIdleMessage(m.background.gistPullMissing);
@@ -201,7 +321,7 @@ async function handle(req: Req): Promise<Res> {
         return { ok: true, data: r };
       }
       case 'getStatus':
-        return { ok: true, data: { progress: lastProgress, hasToken: await authStore.hasToken(), seenOnboarding: (await authStore.getConfig()).seenOnboarding, seenTooltips: (await authStore.getConfig()).seenTooltips } };
+        return { ok: true, data: await getStatusPayload() };
       case 'getDebugStatus': {
         const cfg = await authStore.getConfig();
         const [hasToken, starCount, liveCount, sample] = await Promise.all([
@@ -318,7 +438,10 @@ async function handle(req: Req): Promise<Res> {
       case 'listExcluded':
         return { ok: true, data: await idbTagStore.listExcluded() };
       case 'markOnboardingSeen':
-        await authStore.update({ seenOnboarding: true });
+        await setStoredOnboardingStage('done');
+        return { ok: true };
+      case 'setOnboardingStage':
+        await setStoredOnboardingStage(req.stage);
         return { ok: true };
       case 'markTooltipSeen': {
         const cur = (await authStore.getConfig()).seenTooltips;
@@ -387,3 +510,8 @@ async function selfCheck() {
 }
 selfCheck();
 migrateLanguageTags();
+void authStore.getConfig().then((cfg) => {
+  if (!inFlight && lastProgress.phase === 'idle' && !lastProgress.message) {
+    lastProgress = cfg.lastSyncProgress ?? lastProgress;
+  }
+}).catch(() => {});
