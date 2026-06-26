@@ -12,6 +12,8 @@ export interface SyncStatus {
   seenOnboarding: boolean;
   /** Bitmask of one-time action-button coachmarks shown (bit0=Sync, 1=Push, 2=Pull). */
   seenTooltips: number;
+  /** True while the background is still holding an active serialized job. */
+  inFlight: boolean;
 }
 
 export function mergeProgressStatus(
@@ -24,6 +26,7 @@ export function mergeProgressStatus(
     hasToken: current?.hasToken ?? fallbackHasToken,
     seenOnboarding: current?.seenOnboarding ?? false,
     seenTooltips: current?.seenTooltips ?? 0,
+    inFlight: progress.phase !== 'idle',
   };
 }
 
@@ -37,6 +40,7 @@ export function mergeStatusPatch(
     hasToken: fallbackHasToken,
     seenOnboarding: false,
     seenTooltips: 0,
+    inFlight: false,
   };
   return {
     ...base,
@@ -48,13 +52,19 @@ export function mergeStatusPatch(
 export function mergeStatusSnapshot(current: SyncStatus | null, snapshot: SyncStatus | null): SyncStatus | null {
   if (!snapshot) return current;
   const activeProgress = current?.progress;
+  const keepLiveProgress =
+    !!activeProgress &&
+    !!current?.inFlight &&
+    activeProgress.phase !== 'idle' &&
+    snapshot.progress.phase === 'idle';
   // Preserve the live progress (and seenOnboarding/seenTooltips) from `current`
   // when the snapshot is idle — a fresh getStatus shouldn't clobber an in-flight phase.
   const merged: SyncStatus = {
     ...snapshot,
-    progress: activeProgress && activeProgress.phase !== 'idle' && snapshot.progress.phase === 'idle' ? activeProgress : snapshot.progress,
+    progress: keepLiveProgress ? activeProgress : snapshot.progress,
     seenOnboarding: snapshot.seenOnboarding ?? current?.seenOnboarding ?? false,
     seenTooltips: snapshot.seenTooltips ?? current?.seenTooltips ?? 0,
+    inFlight: keepLiveProgress ? true : snapshot.inFlight ?? current?.inFlight ?? snapshot.progress.phase !== 'idle',
   };
   return merged;
 }

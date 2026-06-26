@@ -9,6 +9,7 @@ import assert from 'node:assert';
 import { hidePanel, isPanelEnabled, onPanelToggle, showPanel } from '../src/content/stars-page/panel-toggle.ts';
 import { mountState, pageOwner } from '../src/content/stars-page/mount-state.ts';
 import { pruneFavoriteOverrides, resolveFavoriteState } from '../src/ui/favorite-state.ts';
+import { pickInitialSyncAction } from '../src/ui/initial-sync.ts';
 import { classifyStarsQueryTrigger } from '../src/ui/stars-refresh.ts';
 
 // --- LWW merge logic (mirrors src/sync/gist-tag-store.ts pull()) ---
@@ -163,6 +164,20 @@ test('initial load and dataChanged reloads are silent', () => {
 });
 test('filter changes still use the fading transition', () => {
   assert.equal(classifyStarsQueryTrigger('query-a', 'query-b'), 'filter-change');
+});
+
+console.log('\nManager auto-sync gate:');
+test('empty library without in-flight job triggers full sync', () => {
+  assert.equal(pickInitialSyncAction({ hasToken: true, inFlight: false }, 0), 'syncFull');
+});
+test('existing library without in-flight job triggers incremental sync', () => {
+  assert.equal(pickInitialSyncAction({ hasToken: true, inFlight: false }, 12), 'syncIncremental');
+});
+test('existing in-flight job blocks duplicate auto-sync on reopen', () => {
+  assert.equal(pickInitialSyncAction({ hasToken: true, inFlight: true }, 12), null);
+});
+test('no token blocks auto-sync', () => {
+  assert.equal(pickInitialSyncAction({ hasToken: false, inFlight: false }, 12), null);
 });
 
 console.log('\nAuto-suggest:');

@@ -64,6 +64,9 @@ export interface Config {
    *  language is a first-class filter, not a tag). Set true after the migration
    *  runs so it never repeats. */
   langTagMigrationDone: boolean;
+  /** Last sync snapshot mirrored from the background so reopened surfaces can
+   *  still show progress/error context after a long-running job or SW wake. */
+  lastSyncProgress: SyncProgress;
 }
 
 export interface CryptoMeta {

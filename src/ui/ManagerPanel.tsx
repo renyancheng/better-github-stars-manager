@@ -10,6 +10,7 @@ import { ActiveFilterChips } from '@/ui/components/ActiveFilterChips';
 import { FloatingLocaleToggle } from '@/ui/components/FloatingLocaleToggle';
 import { RepoDetailPanel } from '@/ui/components/RepoDetailPanel';
 import { pruneFavoriteOverrides, resolveFavoriteState, type FavoriteOverrideState } from '@/ui/favorite-state';
+import { pickInitialSyncAction } from '@/ui/initial-sync';
 import { Button } from '@/ui/shadcn/button';
 import { Spinner } from '@/ui/shadcn/spinner';
 import { PortalProvider } from '@/ui/shadcn/portal-context';
@@ -59,7 +60,8 @@ export function ManagerPanel() {
         const q = await bgCall<{ grandTotal: number }>('query', {
           params: { filter: emptyFilter(), offset: 0, limit: 1 },
         }).catch(() => null);
-        const syncType = q && q.grandTotal > 0 ? 'syncIncremental' : 'syncFull';
+        const syncType = pickInitialSyncAction(st, q?.grandTotal ?? 0);
+        if (!syncType) return;
         const syncLabel = syncType === 'syncIncremental' ? m.popup.syncIncremental : m.popup.syncFull;
         setPendingAction(syncType);
         bgCall(syncType)
@@ -142,7 +144,8 @@ export function ManagerPanel() {
     await bgCall('markOnboardingSeen').catch(() => {});
   };
 
-  const syncingNow = !!pendingAction || (status?.progress.phase != null && status.progress.phase !== 'idle');
+  const progressActive = !!status?.inFlight && status.progress.phase !== 'idle';
+  const syncingNow = !!pendingAction || progressActive;
   const coachReady = !status?.seenOnboarding && !!status?.hasToken && !syncingNow && !info && rows.length > 0;
   useEffect(() => {
     if (coachReady && coachStep === null) setCoachStep(0);
@@ -261,7 +264,7 @@ export function ManagerPanel() {
             {!status?.seenOnboarding && (coachStep === null) ? (
               <OnboardingCard
                 hasToken={!!status?.hasToken}
-                syncing={syncingNow}
+                syncing={progressActive}
                 failedInfo={info}
                 onOpenOptions={() => bgCall('openOptions').catch(() => {})}
                 onRetry={() => void doSync('syncFull', m.popup.syncFull)}

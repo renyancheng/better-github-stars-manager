@@ -14,7 +14,11 @@ export function useTheme() {
       authStore.getTheme().then((t) => setThemeState(t)).catch(() => {});
     };
     const listener = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
-      if (areaName === 'local' && changes[CONFIG_STORAGE_KEY]) syncTheme();
+      if (areaName !== 'local' || !changes[CONFIG_STORAGE_KEY]) return;
+      const oldCfg = changes[CONFIG_STORAGE_KEY].oldValue as Record<string, unknown> | undefined;
+      const newCfg = changes[CONFIG_STORAGE_KEY].newValue as Record<string, unknown> | undefined;
+      if (oldCfg?.theme === newCfg?.theme) return;
+      syncTheme();
     };
 
     syncTheme();

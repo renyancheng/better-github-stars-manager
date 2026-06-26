@@ -29,6 +29,7 @@ const DEFAULT_CONFIG: Config = {
   seenOnboarding: false,
   seenTooltips: 0,
   langTagMigrationDone: false,
+  lastSyncProgress: { phase: "idle", done: 0, total: null, message: "" },
 };
 
 let cache: Config | null = null;

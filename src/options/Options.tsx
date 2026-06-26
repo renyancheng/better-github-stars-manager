@@ -94,7 +94,7 @@ export function Options() {
   };
 
   const syncing = !!(
-    syncStatus?.progress && syncStatus.progress.phase !== "idle"
+    syncStatus?.inFlight && syncStatus.progress && syncStatus.progress.phase !== "idle"
   );
   const progressValue = syncStatus?.progress.total
     ? Math.max(
@@ -119,7 +119,17 @@ export function Options() {
       changes: Record<string, chrome.storage.StorageChange>,
       areaName: string,
     ) => {
-      if (areaName === "local" && changes[CONFIG_STORAGE_KEY]) void refresh();
+      if (areaName !== "local" || !changes[CONFIG_STORAGE_KEY]) return;
+      const oldCfg = changes[CONFIG_STORAGE_KEY].oldValue as Record<string, unknown> | undefined;
+      const newCfg = changes[CONFIG_STORAGE_KEY].newValue as Record<string, unknown> | undefined;
+      if (
+        oldCfg?.username === newCfg?.username &&
+        oldCfg?.gistId === newCfg?.gistId &&
+        oldCfg?.theme === newCfg?.theme &&
+        oldCfg?.locale === newCfg?.locale &&
+        oldCfg?.tokenEncrypted === newCfg?.tokenEncrypted
+      ) return;
+      void refresh();
     };
 
     chrome.storage.onChanged.addListener(listener);
@@ -311,7 +321,7 @@ export function Options() {
           <div className="inline-flex items-center gap-2">
             {syncing && <Spinner className="size-3" />}
             {syncStatus?.progress
-              ? `${m.common.phase(syncStatus.progress.phase)}: ${syncStatus.progress.message || m.popup.idle}`
+              ? `${syncing ? `${m.common.phase(syncStatus.progress.phase)}: ` : ""}${syncStatus.progress.message || m.popup.idle}`
               : m.popup.idle}
           </div>
           {syncing && progressValue != null && (
