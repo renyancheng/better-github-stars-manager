@@ -35,6 +35,12 @@ export function FilterSidebar({
       {/* Special filters */}
       <Section title={m.filterSidebar.specialFilters}>
         <FilterToggle
+          checked={f.onlyFavorite}
+          onChange={() => f.setOnlyFavorite(!f.onlyFavorite)}
+          label={m.filterSidebar.onlyFavoriteLabel}
+          hint={m.filterSidebar.onlyFavoriteHint}
+        />
+        <FilterToggle
           checked={f.onlyUntagged}
           onChange={() => f.setOnlyUntagged(!f.onlyUntagged)}
           label={m.filterSidebar.onlyUntaggedLabel}

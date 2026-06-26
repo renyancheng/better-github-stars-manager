@@ -28,6 +28,7 @@ export function useStars() {
     tags: f.tags,
     tagMode: f.tagMode,
     showTombstone: f.showTombstone,
+    onlyFavorite: f.onlyFavorite,
     onlyUntagged: f.onlyUntagged,
     sortKey: f.sortKey,
     sortDir: f.sortDir,

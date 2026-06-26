@@ -29,6 +29,7 @@ type Req =
   | { type: 'query'; params: QueryParams }
   | { type: 'setTags'; full_name: string; tags: string[] }
   | { type: 'setNotes'; full_name: string; notes: string }
+  | { type: 'setFavorite'; full_name: string; favorite: boolean }
   | { type: 'deleteTag'; name: string }
   | { type: 'acceptSuggestions'; full_name: string; toAdd: string[] }
   | { type: 'acceptSuggestionsBatch'; items: { full_name: string; toAdd: string[] }[] }
@@ -260,6 +261,10 @@ async function handle(req: Req): Promise<Res> {
         await idbTagStore.setNotes(req.full_name, req.notes);
         broadcastDataChanged();
         return { ok: true };
+      case 'setFavorite':
+        await idbTagStore.setFavorite(req.full_name, req.favorite);
+        broadcastDataChanged();
+        return { ok: true, data: { favorite: req.favorite } };
       case 'deleteTag': {
         // Remove this tag from every repo that has it (+ drop its meta).
         const r = await idbTagStore.deleteTag(req.name);

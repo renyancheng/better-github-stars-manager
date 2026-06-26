@@ -165,7 +165,7 @@ export const gistTagStore = {
       const local = await db.tags.get(full_name);
       const remoteMtime = remoteTag.mtime;
       if (!local || remoteMtime > local.mtime) {
-        const mergedTag: Tag = { full_name, ...remoteTag };
+        const mergedTag: Tag = { full_name, ...remoteTag, favorite: remoteTag.favorite ?? false };
         await db.tags.put(mergedTag);
         merged++;
       }

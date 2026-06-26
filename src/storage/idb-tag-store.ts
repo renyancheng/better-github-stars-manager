@@ -15,6 +15,16 @@ function now(): string {
   return new Date().toISOString();
 }
 
+function emptyTag(full_name: string): Tag {
+  return {
+    full_name,
+    tags: [],
+    notes: '',
+    favorite: false,
+    mtime: now(),
+  };
+}
+
 function touch(full_name: string): string {
   dirty.add(full_name);
   return now();
@@ -44,13 +54,8 @@ export const idbTagStore: TagStore = {
   },
 
   async setTags(full_name, tags) {
-    const existing = (await db.tags.get(full_name)) ?? {
-      full_name,
-      tags: [],
-      notes: '',
-      mtime: now(),
-    };
-    await db.tags.put({ ...existing, tags, mtime: touch(full_name) });
+    const existing = (await db.tags.get(full_name)) ?? emptyTag(full_name);
+    await db.tags.put({ ...existing, favorite: existing.favorite ?? false, tags, mtime: touch(full_name) });
     // (Re)typing a previously-deleted (excluded) tag clears its tombstone so auto-assign stops skipping it.
     const newlyAdded = tags.filter((t) => !existing.tags.includes(t));
     for (const name of newlyAdded) {
@@ -62,17 +67,17 @@ export const idbTagStore: TagStore = {
   },
 
   async setNotes(full_name, notes) {
-    const existing = (await db.tags.get(full_name)) ?? {
-      full_name,
-      tags: [],
-      notes: '',
-      mtime: now(),
-    };
-    await db.tags.put({ ...existing, notes, mtime: touch(full_name) });
+    const existing = (await db.tags.get(full_name)) ?? emptyTag(full_name);
+    await db.tags.put({ ...existing, favorite: existing.favorite ?? false, notes, mtime: touch(full_name) });
+  },
+
+  async setFavorite(full_name, favorite) {
+    const existing = (await db.tags.get(full_name)) ?? emptyTag(full_name);
+    await db.tags.put({ ...existing, favorite, mtime: touch(full_name) });
   },
 
   async upsert(tag) {
-    await db.tags.put(tag);
+    await db.tags.put({ ...tag, favorite: tag.favorite ?? false });
     dirty.add(tag.full_name);
   },
 
