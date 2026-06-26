@@ -37,6 +37,10 @@ Tested: Manual diff review
 Not-tested: No runtime checks; this commit only changes documentation text`);
 });
 
+test("accepts single-line chore commits without Lore trailers", () => {
+  expectValid(`chore(store): update marquee promo asset`);
+});
+
 test("rejects titles without a conventional commit prefix", () => {
   expectError(`Keep verification docs aligned
 

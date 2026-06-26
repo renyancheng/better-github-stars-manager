@@ -12,12 +12,14 @@ const REQUIRED_TRAILERS = [
 
 const CONVENTIONAL_PREFIX =
   /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?:\s/i;
+const CHORE_PREFIX = /^chore(\([^)]+\))?!?:\s/i;
 
 export function validateCommitMessage(message) {
   const normalized = message.replace(/\r\n/g, "\n").trimEnd();
   const lines = normalized.split("\n");
   const subject = (lines[0] ?? "").trim();
   const errors = [];
+  const isChore = CHORE_PREFIX.test(subject);
 
   if (!subject) {
     errors.push("Commit title is required.");
@@ -37,13 +39,15 @@ export function validateCommitMessage(message) {
     }
   }
 
-  if (lines.length < 3 || lines[1].trim() !== "") {
+  if (!isChore && (lines.length < 3 || lines[1].trim() !== "")) {
     errors.push("Commit title must be followed by a blank line.");
   }
 
-  for (const trailer of REQUIRED_TRAILERS) {
-    if (!lines.some((line) => line.startsWith(`${trailer}: `))) {
-      errors.push(`Missing Lore trailer: ${trailer}:`);
+  if (!isChore) {
+    for (const trailer of REQUIRED_TRAILERS) {
+      if (!lines.some((line) => line.startsWith(`${trailer}: `))) {
+        errors.push(`Missing Lore trailer: ${trailer}:`);
+      }
     }
   }
 
